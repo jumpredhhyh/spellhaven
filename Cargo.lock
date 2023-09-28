@@ -247,7 +247,7 @@ dependencies = [
  "async-lock",
  "async-task",
  "concurrent-queue",
- "fastrand",
+ "fastrand 1.9.0",
  "futures-lite",
  "slab",
 ]
@@ -375,7 +375,7 @@ dependencies = [
  "bevy_winit",
  "crossbeam-channel",
  "downcast-rs",
- "fastrand",
+ "fastrand 1.9.0",
  "js-sys",
  "notify",
  "parking_lot",
@@ -1190,6 +1190,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "brunch"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12ec8866ee8d4ec8c0770203322d7cfa2d2183b03fc788611c5ffc191f2a5688"
+dependencies = [
+ "dactyl",
+ "unicode-width",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1602,6 +1612,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dactyl"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72f762271c6826d426c3fd2e37aa827fa039596bc7050e9289cb713265be3d7f"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "dasp_sample"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1737,6 +1756,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastrand"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+
+[[package]]
 name = "fdeflate"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1821,7 +1846,7 @@ version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49a9d51ce47660b1e808d3c990b4709f2f415d928835a17dfd16991515c46bce"
 dependencies = [
- "fastrand",
+ "fastrand 1.9.0",
  "futures-core",
  "futures-io",
  "memchr",
@@ -3506,7 +3531,9 @@ dependencies = [
  "bevy_panorbit_camera",
  "bevy_screen_diags",
  "bevy_xpbd_3d",
+ "brunch",
  "criterion",
+ "fastrand 2.0.1",
  "futures-lite",
  "noise",
  "rand 0.8.5",

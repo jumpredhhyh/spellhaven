@@ -10,12 +10,12 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
     let mut triangles: Vec<[u32; 3]> = Vec::new();
     let mut colors: Vec<[f32; 4]> = Vec::new();
 
-    let mut rand = rand::thread_rng();
+    let mut rng = rand::thread_rng();
 
     for x in 1..CHUNK_SIZE[0] + 1 {
         for y in 1..CHUNK_SIZE[1] + 1 {
             for z in 1..CHUNK_SIZE[2] + 1 {
-                if blocks[x][y][z] == BlockType::Air {
+                if blocks[x][y][z] == BlockType::Air || all_neighbours([x, y, z], &blocks) {
                     continue;
                 }
 
@@ -23,9 +23,9 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
                 let y_pos = y as f32;
                 let z_pos = z as f32;
                 let mut color = get_block_color(blocks[x][y][z]);
-                color[0] = color[0] * rand.gen_range(0.8..1.);
-                color[1] = color[1] * rand.gen_range(0.8..1.);
-                color[2] = color[2] * rand.gen_range(0.8..1.);
+                color[0] = color[0] * rng.gen_range(0.8..1.);
+                color[1] = color[1] * rng.gen_range(0.8..1.);
+                color[2] = color[2] * rng.gen_range(0.8..1.);
 
                 if blocks[x][y + 1][z] == BlockType::Air {
                     let positions_count = positions.len() as u32;
@@ -255,6 +255,28 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
     }
 
     Some((mesh, collider_positions, triangles))
+}
+
+fn all_neighbours(pos: [usize; 3], blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> bool {
+    if blocks[pos[0]][pos[1] + 1][pos[2]] == BlockType::Air {
+        return false;
+    }
+    if blocks[pos[0]][pos[1] - 1][pos[2]] == BlockType::Air {
+        return false;
+    }
+    if blocks[pos[0] + 1][pos[1]][pos[2]] == BlockType::Air {
+        return false;
+    }
+    if blocks[pos[0] - 1][pos[1]][pos[2]] == BlockType::Air {
+        return false;
+    }
+    if blocks[pos[0]][pos[1]][pos[2] + 1] == BlockType::Air {
+        return false;
+    }
+    if blocks[pos[0]][pos[1]][pos[2] - 1] == BlockType::Air {
+        return false;
+    }
+    return true;
 }
 
 fn calculate_ambient_occlusion(side1: bool, side2: bool, corner: bool) -> f32 {

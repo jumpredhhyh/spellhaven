@@ -22,10 +22,12 @@ noise = "0.8"
 bevy_atmosphere = "0.7.0"
 bevy_xpbd_3d = { version = "0.2", features = ["simd"] }
 bevy_screen_diags = "0.6.0"
+brunch = "0.5.0"
+fastrand = { version = "2.0.1", features = [] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
-name = "my_benchmark"
+name = "benches"
 harness = false

@@ -25,20 +25,6 @@ pub fn generate_voxels(position: [i32; 2]) -> [[[BlockType; CHUNK_SIZE[2] + 2]; 
     blocks
 }
 
-fn create_blocks_vec() -> Vec<Vec<Vec<BlockType>>> {
-    let mut blocks1 = Vec::with_capacity(CHUNK_SIZE[0] + 2);
-    for x in 0..CHUNK_SIZE[0] + 2 {
-        blocks1.push(Vec::with_capacity(CHUNK_SIZE[1] + 2));
-        for y in 0..CHUNK_SIZE[1] + 2 {
-            blocks1[x].push(Vec::with_capacity(CHUNK_SIZE[2] + 2));
-            for _ in 0..CHUNK_SIZE[2] + 2 {
-                blocks1[x][y].push(BlockType::Air)
-            }
-        }
-    }
-    blocks1
-}
-
 fn fractal_noise(x: i32, z: i32, frequency: f64, amplitude: f64, octaves: i32, lacunarity: f64, persistence: f64, hasher: &PermutationTable) -> f64 {
     let mut noise_value: f64 = 0.;
 
