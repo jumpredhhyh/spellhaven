@@ -3,7 +3,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 use rand::Rng;
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 
-pub fn generate_mesh(blocks: Vec<Vec<Vec<BlockType>>>) -> Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)> {
+pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)> {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     let mut positions: Vec<[f32; 3]> = Vec::new();

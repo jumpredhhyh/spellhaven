@@ -2,8 +2,8 @@ use noise::core::open_simplex::open_simplex_2d;
 use noise::permutationtable::PermutationTable;
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, LEVEL_OF_DETAIL};
 
-pub fn generate_voxels(position: [i32; 2]) -> Vec<Vec<Vec<BlockType>>> {
-    let mut blocks = create_blocks_vec();
+pub fn generate_voxels(position: [i32; 2]) -> [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2] {
+    let mut blocks = [[[BlockType::Air; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2];
     let hasher = PermutationTable::new(0);
     let roughness_hasher = PermutationTable::new(1);
 
@@ -52,7 +52,3 @@ fn fractal_noise(x: i32, z: i32, frequency: f64, amplitude: f64, octaves: i32, l
 fn noise(x: i32, z: i32, frequency: f64, amplitude: f64, hasher: &PermutationTable) -> f64 {
     (open_simplex_2d([x as f64 * frequency, z as f64 * frequency], hasher) + 0.5) * amplitude
 }
-
-// fn biome_noise(x: i32, z: i32, frequency: f64, amplitude: f64, hasher: &PermutationTable) -> f64 {
-//     (open_simplex_2d([x as f64 * frequency, z as f64 * frequency], hasher) + 0.5) * amplitude
-// }
