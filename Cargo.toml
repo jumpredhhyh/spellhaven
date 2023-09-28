@@ -1,0 +1,31 @@
+[package]
+name = "spellhaven"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
+[dependencies]
+bevy = { version = "0.11.2", features = ["dynamic_linking"] }
+bevy_panorbit_camera = "0.8.0"
+rand = "0.8.5"
+futures-lite = "1.13.0"
+noise = "0.8"
+bevy_atmosphere = "0.7.0"
+bevy_xpbd_3d = { version = "0.2", features = ["simd"] }
+bevy_screen_diags = "0.6.0"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "my_benchmark"
+harness = false
