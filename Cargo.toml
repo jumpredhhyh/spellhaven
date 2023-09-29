@@ -26,6 +26,7 @@ bevy_atmosphere = "0.7.0"
 bevy_screen_diags = "0.6.0"
 fastrand = { version = "2.0.1", features = [] }
 bevy_rapier3d = { version = "0.22.0", features = [ "simd-stable", "debug-render-3d" ] }
+vox-format = "0.1.0"
 
 [dev-dependencies]
 brunch = "0.5.0"

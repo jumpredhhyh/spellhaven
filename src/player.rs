@@ -49,7 +49,7 @@ fn setup(
     // Player
     commands.spawn((
         RigidBody::KinematicPositionBased,
-        TransformBundle::from_transform(Transform::from_xyz(0., 60., 0.)),
+        TransformBundle::from_transform(Transform::from_xyz(0., 80., 0.)),
         Collider::cuboid(0.4, 0.9, 0.4),
         KinematicCharacterController {
             offset: CharacterLength::Absolute(0.01),

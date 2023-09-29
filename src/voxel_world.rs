@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use bevy::prelude::{Resource, Transform};
+use bevy::prelude::{Resource, Transform, Vec3};
 use bevy_rapier3d::prelude::Collider;
-use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
+use crate::chunk_generation::{BlockType, CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
 use crate::mesh_generation::generate_mesh;
 use crate::voxel_generation::generate_voxels;
 
@@ -18,7 +18,7 @@ impl DefaultVoxelWorld {
 }
 
 pub trait VoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 2]) -> Option<ChunkTaskData>;
+    fn generate_chunk(chunk_position: [i32; 2], tree_model: &Vec<Vec<Vec<BlockType>>>) -> Option<ChunkTaskData>;
     fn has_chunk(&self, chunk_position: [i32; 2]) -> bool;
     fn add_chunk(&mut self, chunk_position: [i32; 2]) -> bool;
     fn remove_chunk(&mut self, chunk_position: [i32; 2]) -> bool;
@@ -27,13 +27,13 @@ pub trait VoxelWorld {
 impl Resource for DefaultVoxelWorld {}
 
 impl VoxelWorld for DefaultVoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 2]) -> Option<ChunkTaskData> {
-        let mesh = generate_mesh(generate_voxels(chunk_position));
+    fn generate_chunk(chunk_position: [i32; 2], tree_model: &Vec<Vec<Vec<BlockType>>>) -> Option<ChunkTaskData> {
+        let mesh = generate_mesh(generate_voxels(chunk_position, tree_model));
 
         return match mesh {
             None => None,
             Some(mesh) => Some(ChunkTaskData{
-                transform: Transform::from_xyz(chunk_position[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, 0.0, chunk_position[1] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
+                transform: Transform::from_xyz(chunk_position[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, -40.0, chunk_position[1] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
                 collider: Collider::trimesh(mesh.1, mesh.2),
                 mesh: mesh.0,
             })

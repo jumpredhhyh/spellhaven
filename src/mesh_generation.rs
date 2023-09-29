@@ -22,10 +22,10 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
                 let x_pos = x as f32;
                 let y_pos = y as f32;
                 let z_pos = z as f32;
-                let mut color = get_block_color(blocks[x][y][z]);
-                color[0] = color[0] * rng.gen_range(0.8..1.);
-                color[1] = color[1] * rng.gen_range(0.8..1.);
-                color[2] = color[2] * rng.gen_range(0.8..1.);
+                let mut color = blocks[x][y][z].get_color();
+                color[0] = color[0] * rng.gen_range(0.9..1.);
+                color[1] = color[1] * rng.gen_range(0.9..1.);
+                color[2] = color[2] * rng.gen_range(0.9..1.);
 
                 if blocks[x][y + 1][z] == BlockType::Air {
                     let positions_count = positions.len() as u32;
@@ -295,14 +295,5 @@ fn calculate_ambient_occlusion(side1: bool, side2: bool, corner: bool) -> f32 {
 fn add_colors(colors: &mut Vec<[f32; 4]>, color: [f32; 4], ambient_occlusion_multipliers: &[f32; 4]) {
     for i in 0..4 {
         colors.push([color[0] * ambient_occlusion_multipliers[i], color[1] * ambient_occlusion_multipliers[i], color[2] * ambient_occlusion_multipliers[i], color[3]]);
-    }
-}
-
-fn get_block_color(block: BlockType) -> [f32; 4] {
-    match block {
-        BlockType::Air => [0., 0., 0., 0.],
-        BlockType::Stone => [150. / 255., 160. / 255., 155. / 255., 1.],
-        BlockType::Grass => [55. / 255., 195. /255., 95. / 255., 1.],
-        BlockType::Gray(value) => [value as f32 / 255., value as f32 / 255., value as f32 / 255., 1.]
     }
 }

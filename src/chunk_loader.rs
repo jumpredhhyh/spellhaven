@@ -1,6 +1,7 @@
-use bevy::prelude::{App, Commands, Component, Entity, Plugin, Query, ResMut, Transform, Update, Vec3, With};
+use bevy::prelude::{App, Commands, Component, Entity, Plugin, Query, Res, ResMut, Transform, Update, Vec3, With};
 use bevy::tasks::AsyncComputeTaskPool;
-use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, VOXEL_SIZE};
+use crate::animations::DespawnAnimation;
+use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, TreeModel, VOXEL_SIZE};
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
@@ -20,7 +21,8 @@ pub struct ChunkLoader{
 fn load_chunks(
     mut voxel_world: ResMut<DefaultVoxelWorld>,
     mut commands: Commands,
-    chunk_loaders: Query<(&ChunkLoader, &Transform)>
+    chunk_loaders: Query<(&ChunkLoader, &Transform)>,
+    tree_model: Res<TreeModel>
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
 
@@ -35,8 +37,10 @@ fn load_chunks(
                     continue;
                 }
 
+                let model = tree_model.model.clone();
+
                 let task = thread_pool.spawn(async move {
-                    DefaultVoxelWorld::generate_chunk(chunk_position)
+                    DefaultVoxelWorld::generate_chunk(chunk_position, &model)
                 });
 
 
@@ -70,7 +74,7 @@ fn unload_chunks(
         }
 
         if voxel_world.remove_chunk(chunk_position) {
-            commands.entity(entity).despawn();
+            commands.entity(entity).remove::<Chunk>().insert(DespawnAnimation::default());
         }
     }
 }

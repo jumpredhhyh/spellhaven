@@ -7,6 +7,8 @@ use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use bevy_screen_diags::ScreenDiagsTextPlugin;
 use spellhaven::chunk_generation::ChunkGenerationPlugin;
 use spellhaven::chunk_loader::ChunkLoader;
+use spellhaven::animations::AnimationPlugin;
+use spellhaven::bird_camera::BirdCameraPlugin;
 use spellhaven::player::PlayerPlugin;
 
 fn main() {
@@ -20,10 +22,11 @@ fn main() {
             //RapierDebugRenderPlugin::default(),
             ScreenDiagsTextPlugin,
             //PlayerPlugin,
-            WireframePlugin
+            WireframePlugin,
+            AnimationPlugin,
+            BirdCameraPlugin
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, move_camera_pivot)
         .insert_resource(WireframeConfig {
             global: false,
         })
@@ -51,32 +54,4 @@ fn setup(
         color: Color::ANTIQUE_WHITE,
         brightness: 0.05,
     });
-
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
-        PanOrbitCamera::default(),
-        //AtmosphereCamera::default()
-    ));
-
-    commands.spawn((
-        TransformBundle::from_transform(Transform::from_xyz(0., 0., 0.)),
-        ChunkLoader {
-            load_range: 25,
-            unload_range: 30
-        },
-        CameraPivotPoint
-    ));
-}
-
-#[derive(Component)]
-struct CameraPivotPoint;
-
-fn move_camera_pivot(
-    camera: Query<&PanOrbitCamera>,
-    mut camera_pivot: Query<&mut Transform, With<CameraPivotPoint>>
-) {
-    camera_pivot.single_mut().translation = camera.single().focus;
 }
