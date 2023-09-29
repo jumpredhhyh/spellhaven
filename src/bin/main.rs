@@ -3,9 +3,11 @@ use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
 use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmospherePlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use bevy_screen_diags::ScreenDiagsTextPlugin;
-use bevy_xpbd_3d::prelude::PhysicsPlugins;
 use spellhaven::chunk_generation::ChunkGenerationPlugin;
+use spellhaven::chunk_loader::ChunkLoader;
+use spellhaven::player::PlayerPlugin;
 
 fn main() {
     App::new()
@@ -14,12 +16,14 @@ fn main() {
             PanOrbitCameraPlugin,
             ChunkGenerationPlugin,
             AtmospherePlugin,
-            PhysicsPlugins::default(),
+            RapierPhysicsPlugin::<NoUserData>::default(),
+            //RapierDebugRenderPlugin::default(),
             ScreenDiagsTextPlugin,
-            // PlayerPlugin,
+            //PlayerPlugin,
             WireframePlugin
         ))
         .add_systems(Startup, setup)
+        .add_systems(Update, move_camera_pivot)
         .insert_resource(WireframeConfig {
             global: false,
         })
@@ -37,7 +41,7 @@ fn setup(
         },
         transform: Transform {
             translation: Vec3::new(0.0, 2.0, 0.0),
-            rotation: Quat::from_rotation_x(-PI / 4.),
+            rotation: Quat::from_rotation_x(-PI / 3.),
             ..default()
         },
         ..default()
@@ -56,4 +60,23 @@ fn setup(
         PanOrbitCamera::default(),
         //AtmosphereCamera::default()
     ));
+
+    commands.spawn((
+        TransformBundle::from_transform(Transform::from_xyz(0., 0., 0.)),
+        ChunkLoader {
+            load_range: 25,
+            unload_range: 30
+        },
+        CameraPivotPoint
+    ));
+}
+
+#[derive(Component)]
+struct CameraPivotPoint;
+
+fn move_camera_pivot(
+    camera: Query<&PanOrbitCamera>,
+    mut camera_pivot: Query<&mut Transform, With<CameraPivotPoint>>
+) {
+    camera_pivot.single_mut().translation = camera.single().focus;
 }

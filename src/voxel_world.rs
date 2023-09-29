@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use bevy::prelude::{Resource, Transform};
-use bevy_xpbd_3d::prelude::Collider;
+use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
 use crate::mesh_generation::generate_mesh;
 use crate::voxel_generation::generate_voxels;

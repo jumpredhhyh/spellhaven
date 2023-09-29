@@ -1,4 +1,4 @@
-use bevy::prelude::{App, Commands, Component, DespawnRecursiveExt, Entity, Plugin, Query, ResMut, Transform, Update, Vec3, With};
+use bevy::prelude::{App, Commands, Component, Entity, Plugin, Query, ResMut, Transform, Update, Vec3, With};
 use bevy::tasks::AsyncComputeTaskPool;
 use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, VOXEL_SIZE};
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
@@ -70,7 +70,7 @@ fn unload_chunks(
         }
 
         if voxel_world.remove_chunk(chunk_position) {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }

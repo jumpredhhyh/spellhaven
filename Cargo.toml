@@ -13,6 +13,9 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
+[profile.release]
+codegen-units = 1
+
 [dependencies]
 bevy = { version = "0.11.2", features = ["dynamic_linking"] }
 bevy_panorbit_camera = "0.8.0"
@@ -20,13 +23,12 @@ rand = "0.8.5"
 futures-lite = "1.13.0"
 noise = "0.8"
 bevy_atmosphere = "0.7.0"
-bevy_xpbd_3d = { version = "0.2", features = ["simd"] }
 bevy_screen_diags = "0.6.0"
-brunch = "0.5.0"
 fastrand = { version = "2.0.1", features = [] }
+bevy_rapier3d = { version = "0.22.0", features = [ "simd-stable", "debug-render-3d" ] }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
+brunch = "0.5.0"
 
 [[bench]]
 name = "benches"
