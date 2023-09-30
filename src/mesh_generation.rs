@@ -3,7 +3,7 @@ use bevy::render::mesh::{Indices, PrimitiveTopology};
 use rand::Rng;
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 
-pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)> {
+pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool)) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -11,6 +11,8 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
     let mut colors: Vec<[f32; 4]> = Vec::new();
 
     let mut rng = rand::thread_rng();
+
+    let (blocks, min_height, generate_more) = generation_result;
 
     for x in 1..CHUNK_SIZE[0] + 1 {
         for y in 1..CHUNK_SIZE[1] + 1 {
@@ -224,7 +226,7 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
 
     for position in positions.iter_mut() {
         position[0] = position[0] * VOXEL_SIZE;
-        position[1] = position[1] * VOXEL_SIZE;
+        position[1] = (position[1] + min_height as f32) * VOXEL_SIZE;
         position[2] = position[2] * VOXEL_SIZE;
     }
 
@@ -251,10 +253,10 @@ pub fn generate_mesh(blocks: [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2
     mesh.compute_flat_normals();
 
     if triangles.is_empty() {
-        return None;
+        return (None, generate_more);
     }
 
-    Some((mesh, collider_positions, triangles))
+    (Some((mesh, collider_positions, triangles)), generate_more)
 }
 
 fn all_neighbours(pos: [usize; 3], blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> bool {

@@ -1,7 +1,7 @@
 use bevy::prelude::{App, Commands, Component, Entity, Plugin, Query, Res, ResMut, Transform, Update, Vec3, With};
 use bevy::tasks::AsyncComputeTaskPool;
 use crate::animations::DespawnAnimation;
-use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, TreeModel, VOXEL_SIZE};
+use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkTaskPool, TreeModel, VOXEL_SIZE};
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
@@ -22,16 +22,15 @@ fn load_chunks(
     mut voxel_world: ResMut<DefaultVoxelWorld>,
     mut commands: Commands,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
-    tree_model: Res<TreeModel>
+    tree_model: Res<TreeModel>,
+    task_pool: Res<ChunkTaskPool>
 ) {
-    let thread_pool = AsyncComputeTaskPool::get();
-
     for (chunk_loader, transform) in &chunk_loaders {
         let loader_chunk_pos = get_chunk_position(transform.translation);
 
         for x in -chunk_loader.load_range..chunk_loader.load_range + 1 {
             for z in -chunk_loader.load_range..chunk_loader.load_range + 1 {
-                let chunk_position = [loader_chunk_pos[0] + x, loader_chunk_pos[1] + z];
+                let chunk_position = [loader_chunk_pos[0] + x, 0, loader_chunk_pos[1] + z];
 
                 if !voxel_world.add_chunk(chunk_position) {
                     continue;
@@ -39,7 +38,7 @@ fn load_chunks(
 
                 let model = tree_model.model.clone();
 
-                let task = thread_pool.spawn(async move {
+                let task = task_pool.0.spawn(async move {
                     DefaultVoxelWorld::generate_chunk(chunk_position, &model)
                 });
 
@@ -54,16 +53,14 @@ fn unload_chunks(
     mut voxel_world: ResMut<DefaultVoxelWorld>,
     mut commands: Commands,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
-    chunks: Query<(Entity, &Transform), With<Chunk>>
+    chunks: Query<(Entity, &Chunk)>
 ) {
-    for (entity, transform) in &chunks {
-        let chunk_position = get_chunk_position(transform.translation);
-
+    for (entity, chunk) in &chunks {
         let mut should_unload = true;
 
         for (chunk_loader, chunk_loader_transform) in &chunk_loaders {
             let loader_chunk_pos = get_chunk_position(chunk_loader_transform.translation);
-            if (chunk_position[0] - loader_chunk_pos[0]).abs() < chunk_loader.unload_range && (chunk_position[1] - loader_chunk_pos[1]).abs() < chunk_loader.unload_range {
+            if (chunk.0[0] - loader_chunk_pos[0]).abs() < chunk_loader.unload_range && (chunk.0[2] - loader_chunk_pos[1]).abs() < chunk_loader.unload_range {
                 should_unload = false;
                 break;
             }
@@ -73,7 +70,7 @@ fn unload_chunks(
             continue;
         }
 
-        if voxel_world.remove_chunk(chunk_position) {
+        if voxel_world.remove_chunk(chunk.0) {
             commands.entity(entity).remove::<Chunk>().insert(DespawnAnimation::default());
         }
     }

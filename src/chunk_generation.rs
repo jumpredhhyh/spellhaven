@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::tasks::{AsyncComputeTaskPool, Task};
+use bevy::tasks::{AsyncComputeTaskPool, Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
 use vox_format::VoxData;
@@ -9,7 +9,7 @@ use crate::voxel_generation::vox_data_to_blocks;
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub const LEVEL_OF_DETAIL: i32 = 1;
-pub const CHUNK_SIZE: [usize; 3] = [16, 256, 16];
+pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
 pub const VOXEL_SIZE: f32 = 0.5 * LEVEL_OF_DETAIL as f32;
 
 pub struct ChunkTaskData{
@@ -49,6 +49,10 @@ pub struct TreeModel {
 
 impl Resource for TreeModel {}
 
+pub struct ChunkTaskPool(pub TaskPool);
+
+impl Resource for ChunkTaskPool {}
+
 impl Plugin for ChunkGenerationPlugin {
     fn build(&self, app: &mut App) {
         app
@@ -58,29 +62,29 @@ impl Plugin for ChunkGenerationPlugin {
             .insert_resource(DefaultVoxelWorld::default())
             .insert_resource(TreeModel {
                 model: vox_data_to_blocks(vox_format::from_file("assets/tree.vox").unwrap())
-            });
+            })
+            .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().stack_size(3_000_000).build()));
     }
 }
 
 fn setup(
     mut commands: Commands,
     mut voxel_world: ResMut<DefaultVoxelWorld>,
-    tree_model: Res<TreeModel>
+    tree_model: Res<TreeModel>,
+    task_pool: Res<ChunkTaskPool>
 ) {
-    let thread_pool = AsyncComputeTaskPool::get();
-
     let size = 5;
 
     for x in -size..size + 1 {
         for z in -size..size + 1 {
-            if !voxel_world.add_chunk([x, z]) {
+            if !voxel_world.add_chunk([x, 0, z]) {
                 continue;
             }
 
             let model = tree_model.model.clone();
 
-            let task = thread_pool.spawn(async move {
-                DefaultVoxelWorld::generate_chunk([x, z], &model)
+            let task = task_pool.0.spawn(async move {
+                DefaultVoxelWorld::generate_chunk([x, 0, z], &model)
             });
 
             commands.spawn(ChunkGenerationTask(task));
@@ -89,21 +93,38 @@ fn setup(
 }
 
 #[derive(Component)]
-pub struct ChunkGenerationTask(pub Task<Option<ChunkTaskData>>);
+pub struct ChunkGenerationTask(pub Task<(Option<ChunkTaskData>, bool, [i32; 3])>);
 
 #[derive(Component)]
-pub struct Chunk;
+pub struct Chunk(pub [i32; 3]);
 
 fn set_generated_chunks(
     mut commands: Commands,
     mut chunks: Query<(Entity, &mut ChunkGenerationTask)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut voxel_world: ResMut<DefaultVoxelWorld>,
+    tree_model: Res<TreeModel>,
+    task_pool: Res<ChunkTaskPool>
 ){
     for (entity, mut task) in &mut chunks {
         if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
-            if chunk_task_data_option.is_some() {
-                let chunk_task_data = chunk_task_data_option.unwrap();
+            if chunk_task_data_option.1 {
+                let new_chunk_pos: [i32; 3] = [chunk_task_data_option.2[0], chunk_task_data_option.2[1] + 1, chunk_task_data_option.2[2]];
+
+                if voxel_world.add_chunk(new_chunk_pos) {
+                    let model = tree_model.model.clone();
+
+                    let task = task_pool.0.spawn(async move {
+                        DefaultVoxelWorld::generate_chunk(new_chunk_pos, &model)
+                    });
+
+                    commands.spawn(ChunkGenerationTask(task));
+                }
+            }
+
+            if chunk_task_data_option.0.is_some() {
+                let chunk_task_data = chunk_task_data_option.0.unwrap();
 
                 commands.entity(entity).remove::<ChunkGenerationTask>();
 
@@ -116,7 +137,7 @@ fn set_generated_chunks(
                         transform: chunk_task_data.transform,
                         ..default()
                     },
-                    Chunk,
+                    Chunk(chunk_task_data_option.2),
                     SpawnAnimation::default()
                 ));
             } else {

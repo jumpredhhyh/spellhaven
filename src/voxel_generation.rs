@@ -5,30 +5,34 @@ use noise::{Cache, Fbm, MultiFractal, NoiseFn, Perlin, Value, Worley};
 use vox_format::VoxData;
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, LEVEL_OF_DETAIL};
 
-pub fn generate_voxels(position: [i32; 2], tree_model: &Vec<Vec<Vec<BlockType>>>) -> [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2] {
+pub fn generate_voxels(position: [i32; 3], tree_model: &Vec<Vec<Vec<BlockType>>>) -> ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool) {
     let mut blocks = [[[BlockType::Air; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2];
-    let hasher = PermutationTable::new(0);
-    let roughness_hasher = PermutationTable::new(1);
     let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12) * LEVEL_OF_DETAIL as f64);
     let tree_noise = Cache::new(Worley::new(3));
+
+    let hasher = PermutationTable::new(0);
+    let roughness_hasher = PermutationTable::new(1);
+
+    let (terrain_height, min_height) = generate_chunk_noise(&position);
+
+    let mut generate_more: bool = false;
 
     for x in 0..CHUNK_SIZE[0] + 2 {
         for z in 0..CHUNK_SIZE[2] + 2 {
             let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32;
-            let total_z = position[1] * CHUNK_SIZE[2] as i32 + z as i32;
-
-            let roughness = noise(total_x, total_z, 0.5f64.powi(9) * LEVEL_OF_DETAIL as f64, 0.2 / LEVEL_OF_DETAIL as f64, &roughness_hasher) - 0.15;
-
-            let noise_height = fractal_noise(total_x, total_z, 0.5f64.powi(8) * LEVEL_OF_DETAIL as f64, 128. / LEVEL_OF_DETAIL as f64, 7, 2., 0.5 + roughness, &hasher);
+            let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32;
 
             let dryness = value_noise.get([total_x as f64, total_z as f64]);
+
+            let noise_height = terrain_height[x][z];
 
             let tree_offset_x = total_x / 5;
             let tree_offset_z = total_z / 5;
             let tree_value = tree_noise.get([tree_offset_x as f64 * 12., tree_offset_z as f64 * 12.]);
 
-            for y in 0..noise_height.min((CHUNK_SIZE[1] + 1) as f64) as usize {
-                blocks[x][y][z] = if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
+            for y in min_height as usize..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f64) as usize {
+                if y == CHUNK_SIZE[1] + 1 + min_height as usize { generate_more = true; }
+                blocks[x][y - min_height as usize][z] = if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
                 //blocks[x][y][z] = BlockType::Gray(((tree_value) * 255.) as u8)
             }
 
@@ -43,14 +47,45 @@ pub fn generate_voxels(position: [i32; 2], tree_model: &Vec<Vec<Vec<BlockType>>>
                 let noise_height = fractal_noise(tree_noise_height_x, tree_noise_height_z, 0.5f64.powi(8) * LEVEL_OF_DETAIL as f64, 128. / LEVEL_OF_DETAIL as f64, 7, 2., 0.5 + roughness, &hasher);
 
                 for (index, sub_tree) in tree_model[tree_x].iter().enumerate() {
+                    if (noise_height as i32 - min_height + index as i32) < 0 {
+                        continue;
+                    }
+                    if noise_height as usize + index - min_height as usize >= CHUNK_SIZE[1] + 2 {
+                        if sub_tree[tree_z] == BlockType::Air { continue; }
+                        generate_more = true;
+                        break;
+                    }
                     if sub_tree[tree_z] == BlockType::Air { continue; }
-                    blocks[x][noise_height as usize + index][z] = sub_tree[tree_z];
+                    blocks[x][noise_height as usize + index - min_height as usize][z] = sub_tree[tree_z];
                 }
             }
         }
     }
 
-    blocks
+    (blocks, min_height, generate_more)
+}
+
+fn generate_chunk_noise(position: &[i32; 3]) -> ([[f64; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[0] + 2], i32) {
+    let mut result = [[0f64; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[0] + 2];
+
+    let mut min = f64::MAX;
+
+    let hasher = PermutationTable::new(0);
+    let roughness_hasher = PermutationTable::new(1);
+
+    for x in 0..CHUNK_SIZE[0] + 2 {
+        for z in 0..CHUNK_SIZE[2] + 2 {
+            let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32;
+            let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32;
+
+            let roughness = noise(total_x, total_z, 0.5f64.powi(9) * LEVEL_OF_DETAIL as f64, 0.2 / LEVEL_OF_DETAIL as f64, &roughness_hasher) - 0.15;
+            let noise_height = fractal_noise(total_x, total_z, 0.5f64.powi(8) * LEVEL_OF_DETAIL as f64, 128. / LEVEL_OF_DETAIL as f64, 7, 2., 0.5 + roughness, &hasher);
+            min = min.min(noise_height);
+            result[x][z] = noise_height;
+        }
+    }
+
+    (result, min as i32 - 2 + position[1] * CHUNK_SIZE[1] as i32)
 }
 
 fn fractal_noise(x: i32, z: i32, frequency: f64, amplitude: f64, octaves: i32, lacunarity: f64, persistence: f64, hasher: &PermutationTable) -> f64 {

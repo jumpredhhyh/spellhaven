@@ -28,8 +28,8 @@ fn setup(
     commands.spawn((
         TransformBundle::from_transform(Transform::from_xyz(0., 0., 0.)),
         ChunkLoader {
-            load_range: 50,
-            unload_range: 55
+            load_range: 10,
+            unload_range: 12
         },
         CameraPivotPoint
     ));
