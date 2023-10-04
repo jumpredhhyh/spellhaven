@@ -2,14 +2,12 @@ use std::f32::consts::PI;
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
 use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmospherePlugin;
-use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
+use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use bevy_screen_diags::ScreenDiagsTextPlugin;
 use spellhaven::chunk_generation::ChunkGenerationPlugin;
-use spellhaven::chunk_loader::ChunkLoader;
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
-use spellhaven::player::PlayerPlugin;
 
 fn main() {
     App::new()

@@ -1,3 +1,5 @@
+#![feature(int_roundings)]
+
 pub mod chunk_generation;
 pub mod mesh_generation;
 pub mod voxel_generation;
