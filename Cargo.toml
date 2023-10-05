@@ -16,8 +16,12 @@ opt-level = 3
 [profile.release]
 codegen-units = 1
 
+[profile.profiling]
+inherits = "release"
+debug = true
+
 [dependencies]
-bevy = { version = "0.11.2", features = ["dynamic_linking"] }
+bevy = { version = "0.11.2" }
 bevy_panorbit_camera = "0.8.0"
 rand = "0.8.5"
 futures-lite = "1.13.0"

@@ -1,7 +1,8 @@
+use std::sync::Arc;
 use bevy::log::warn;
 use bevy::prelude::{App, Commands, Component, Entity, Or, Plugin, Query, Res, ResMut, Transform, Update, Vec3, With};
 use crate::animations::DespawnAnimation;
-use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkTaskPool, VOXEL_SIZE};
+use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationAssets, ChunkGenerationTask, ChunkTaskPool, VOXEL_SIZE};
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
@@ -21,6 +22,7 @@ pub struct ChunkLoader{
 fn load_chunks(
     mut voxel_world: ResMut<DefaultVoxelWorld>,
     mut commands: Commands,
+    generation_assets: Res<ChunkGenerationAssets>,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
     task_pool: Res<ChunkTaskPool>
 ) {
@@ -34,9 +36,10 @@ fn load_chunks(
                 if !voxel_world.add_chunk(chunk_position) {
                     continue;
                 }
+                let generation_assets = Arc::clone(&generation_assets.0);
 
                 let task = task_pool.0.spawn(async move {
-                    DefaultVoxelWorld::generate_chunk(chunk_position)
+                    DefaultVoxelWorld::generate_chunk(chunk_position, generation_assets)
                 });
 
 

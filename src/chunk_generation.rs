@@ -1,11 +1,12 @@
+use std::sync::Arc;
 use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
-use noise::{Abs, Cache, Value};
 use crate::animations::SpawnAnimation;
 use crate::chunk_loader::ChunkLoaderPlugin;
-use crate::voxel_generation::{StructureGenerator, vox_data_model_size, vox_data_to_blocks};
+use crate::generation_options::GenerationAssets;
+use crate::voxel_generation::vox_data_to_structure_data;
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub const LEVEL_OF_DETAIL: i32 = 1;
@@ -43,26 +44,8 @@ impl BlockType {
 
 pub struct ChunkGenerationPlugin;
 
-pub struct GenerationOptions {
-    pub structures: Vec<StructureGenerator>
-}
-
-impl GenerationOptions {
-    pub fn get_options() -> GenerationOptions {
-        let tree_model = vox_format::from_file("assets/tree.vox").unwrap();
-        GenerationOptions {
-            structures: vec![
-                StructureGenerator {
-                    model: vox_data_to_blocks(&tree_model),
-                    model_size: vox_data_model_size(&tree_model),
-                    noise: Box::new(Cache::new(Abs::new(Value::new(3)))),
-                    generation_size: [15, 15],
-                    generate_debug_blocks: false
-                }
-            ]
-        }
-    }
-}
+#[derive(Resource)]
+pub struct ChunkGenerationAssets(pub Arc<GenerationAssets>);
 
 pub struct ChunkTaskPool(pub TaskPool);
 
@@ -75,13 +58,18 @@ impl Plugin for ChunkGenerationPlugin {
             .add_systems(Startup, setup)
             .add_systems(Update, set_generated_chunks)
             .insert_resource(DefaultVoxelWorld::default())
-            .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()));
+            .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
+            .insert_resource(ChunkGenerationAssets(Arc::new(GenerationAssets {
+                tree: vox_data_to_structure_data(&vox_format::from_file("assets/tree.vox").unwrap()),
+                tree_house: vox_data_to_structure_data(&vox_format::from_file("assets/tree_house.vox").unwrap()),
+            })));
     }
 }
 
 fn setup(
     mut commands: Commands,
     mut voxel_world: ResMut<DefaultVoxelWorld>,
+    generation_assets: Res<ChunkGenerationAssets>,
     task_pool: Res<ChunkTaskPool>
 ) {
     let size = 5;
@@ -93,9 +81,10 @@ fn setup(
             }
 
             let chunk_position = [x, 0, z];
+            let generation_assets = Arc::clone(&generation_assets.0);
 
             let task = task_pool.0.spawn(async move {
-                DefaultVoxelWorld::generate_chunk(chunk_position)
+                DefaultVoxelWorld::generate_chunk(chunk_position, generation_assets)
             });
 
             commands.spawn(ChunkGenerationTask(task, chunk_position));
@@ -115,16 +104,18 @@ fn set_generated_chunks(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut voxel_world: ResMut<DefaultVoxelWorld>,
+    generation_assets: Res<ChunkGenerationAssets>,
     task_pool: Res<ChunkTaskPool>
 ){
     for (entity, mut task) in &mut chunks {
         if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
             if chunk_task_data_option.1 {
                 let new_chunk_pos: [i32; 3] = [chunk_task_data_option.2[0], chunk_task_data_option.2[1] + 1, chunk_task_data_option.2[2]];
+                let generation_assets = Arc::clone(&generation_assets.0);
 
                 if voxel_world.add_chunk(new_chunk_pos) {
                     let task = task_pool.0.spawn(async move {
-                        DefaultVoxelWorld::generate_chunk(new_chunk_pos)
+                        DefaultVoxelWorld::generate_chunk(new_chunk_pos, generation_assets)
                     });
 
                     commands.spawn(ChunkGenerationTask(task, new_chunk_pos));

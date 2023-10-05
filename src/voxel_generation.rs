@@ -1,16 +1,19 @@
+use std::sync::Arc;
 use noise::core::open_simplex::open_simplex_2d;
 use noise::permutationtable::PermutationTable;
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
-use rand::rngs::StdRng;
+use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use vox_format::VoxData;
-use crate::chunk_generation::{BlockType, CHUNK_SIZE, GenerationOptions, LEVEL_OF_DETAIL};
+use crate::chunk_generation::{BlockType, CHUNK_SIZE, LEVEL_OF_DETAIL};
+use crate::generation_options::GenerationOptions;
 
 pub struct StructureGenerator {
-    pub model: Vec<Vec<Vec<BlockType>>>,
+    pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
     pub model_size: [i32; 3],
     pub noise: Box<dyn NoiseFn<f64, 2>>,
     pub generation_size: [i32; 2],
+    pub grid_offset: [i32; 2],
     pub generate_debug_blocks: bool
 }
 
@@ -40,8 +43,8 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             }
 
             for structure in &generation_options.structures {
-                let structure_offset_x = total_x.div_floor(structure.generation_size[0]);
-                let structure_offset_z = total_z.div_floor(structure.generation_size[1]);
+                let structure_offset_x = (total_x + structure.grid_offset[0]).div_floor(structure.generation_size[0]);
+                let structure_offset_z = (total_z + structure.grid_offset[1]).div_floor(structure.generation_size[1]);
                 let structure_value = structure.noise.get([structure_offset_x as f64, structure_offset_z as f64]);
                 if structure.generate_debug_blocks {
                     blocks[x][(noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1][z] = BlockType::Gray(((structure_value) * 255.) as u8);
@@ -52,15 +55,15 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let random_x = rand.gen_range(0..=structure.generation_size[0] - structure.model_size[0]);
                     let random_z = rand.gen_range(0..=structure.generation_size[1] - structure.model_size[2]);
 
-                    let structure_x = (total_x - structure_offset_x * structure.generation_size[0]).abs() - random_x;
-                    let structure_z = (total_z - structure_offset_z * structure.generation_size[1]).abs() - random_z;
+                    let structure_x = (total_x + structure.grid_offset[0] - structure_offset_x * structure.generation_size[0]).abs() - random_x;
+                    let structure_z = (total_z + structure.grid_offset[1] - structure_offset_z * structure.generation_size[1]).abs() - random_z;
 
                     if structure_x < 0 || structure_z < 0 || structure_x >= structure.model_size[0] || structure_z >= structure.model_size[2] {
                         continue;
                     }
 
-                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0] + (structure.model_size[0] / 2) + random_x;
-                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1] + (structure.model_size[2] / 2) + random_z;
+                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0] + (structure.model_size[0] / 2) - structure.grid_offset[0] + random_x;
+                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1] + (structure.model_size[2] / 2) - structure.grid_offset[1] + random_z;
 
                     let roughness = noise(structure_noise_height_x, structure_noise_height_z, 0.5f64.powi(9) * LEVEL_OF_DETAIL as f64, 0.2 / LEVEL_OF_DETAIL as f64, &roughness_hasher) - 0.15;
                     let noise_height = fractal_noise(structure_noise_height_x, structure_noise_height_z, 0.5f64.powi(8) * LEVEL_OF_DETAIL as f64, 128. / LEVEL_OF_DETAIL as f64, 7, 2., 0.5 + roughness, &hasher);
@@ -146,4 +149,8 @@ pub fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
 pub fn vox_data_model_size(vox_data: &VoxData) -> [i32; 3] {
     let model_size = vox_data.models.first().unwrap().size;
     [model_size.x as i32, model_size.z as i32, model_size.y as i32]
+}
+
+pub fn vox_data_to_structure_data(vox_data: &VoxData) -> (Arc<Vec<Vec<Vec<BlockType>>>>, [i32; 3]) {
+    (Arc::new(vox_data_to_blocks(vox_data)), vox_data_model_size(vox_data))
 }
