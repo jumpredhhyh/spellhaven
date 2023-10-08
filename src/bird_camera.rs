@@ -1,5 +1,5 @@
 use bevy::app::App;
-use bevy::prelude::{Camera3dBundle, Commands, Component, default, Plugin, Query, Startup, Transform, TransformBundle, Update, Vec3, With};
+use bevy::prelude::{Camera3dBundle, Commands, Component, default, Name, Plugin, Query, Startup, Transform, TransformBundle, Update, Vec3, With};
 use bevy_panorbit_camera::PanOrbitCamera;
 use crate::chunk_loader::ChunkLoader;
 
@@ -22,7 +22,8 @@ fn setup(
             ..default()
         },
         PanOrbitCamera::default(),
-        //AtmosphereCamera::default()
+        //AtmosphereCamera::default(),
+        Name::new("BirdCamera")
     ));
 
     commands.spawn((
@@ -31,7 +32,8 @@ fn setup(
             load_range: 10,
             unload_range: 12
         },
-        CameraPivotPoint
+        CameraPivotPoint,
+        Name::new("BirdCameraPivot")
     ));
 }
 

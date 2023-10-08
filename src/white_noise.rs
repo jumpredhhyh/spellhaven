@@ -41,7 +41,6 @@ impl Seedable for WhiteNoise {
 impl NoiseFn<f64, 2usize> for WhiteNoise {
     fn get(&self, point: [f64; 2]) -> f64 {
         ((hash(Wrapping((point[0] as i64 + i32::MAX as i64) as u32)) * Wrapping(self.seed) * hash(Wrapping((point[1] as i64 + i32::MAX as i64) as u32))).0 as f64 - i32::MAX as f64) / i32::MAX as f64
-        // ((53 + int_hash(point[0] as i64)) * 53 + int_hash(point[1] as i64)) as f64 / i64::MAX as f64
     }
 }
 

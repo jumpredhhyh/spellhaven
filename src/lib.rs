@@ -12,3 +12,5 @@ pub mod animations;
 pub mod bird_camera;
 pub mod white_noise;
 pub mod generation_options;
+pub mod fractal_open_simplex;
+pub mod roughness;

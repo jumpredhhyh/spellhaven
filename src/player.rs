@@ -45,11 +45,12 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     // Player
     commands.spawn((
         RigidBody::KinematicPositionBased,
-        TransformBundle::from_transform(Transform::from_xyz(0., 80., 0.)),
+        TransformBundle::from_transform(Transform::from_xyz(0., 200., 0.)),
         Collider::cuboid(0.4, 0.9, 0.4),
         KinematicCharacterController {
             offset: CharacterLength::Absolute(0.01),
@@ -64,7 +65,8 @@ fn setup(
         ChunkLoader{
             unload_range: 20,
             load_range: 15
-        }
+        },
+        Name::new("Player")
     ));
 
     commands.spawn((
@@ -74,20 +76,37 @@ fn setup(
         },
         PanOrbitCamera::default(),
         AtmosphereCamera::default(),
-        PlayerCamera
+        PlayerCamera,
+        Name::new("PlayerCamera")
     ));
 
     commands.spawn((
-        PbrBundle {
-           mesh: meshes.add(Mesh::from(shape::Capsule {
-               radius: 0.4,
-               ..default()
-           })),
-           material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
-           ..default()
-        },
-        PlayerBody
-    ));
+        PbrBundle::default(),
+        PlayerBody,
+        Name::new("PlayerBody")
+    )).with_children(|commands| {
+        commands.spawn((
+            SceneBundle {
+                scene: asset_server.load("player.gltf#Scene0"),
+                transform: Transform::from_xyz(0., 0.15, 0.),
+                ..default()
+            },
+            Name::new("PlayerHead")
+        ));
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Capsule {
+                    radius: 0.4,
+                    depth: 0.3,
+                    ..default()
+                })),
+                transform: Transform::from_xyz(0., -0.35, 0.),
+                material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+                ..default()
+            },
+            Name::new("PlayerTorso")
+        ));
+    });
 }
 
 fn move_body(
@@ -103,7 +122,7 @@ fn move_camera(
     mut camera: Query<&mut PanOrbitCamera, (With<PlayerCamera>, Without<Player>)>
 ) {
     let camera_position = camera.single().target_focus;
-    let difference = player.single().translation - camera_position;
+    let difference = (player.single().translation + Vec3::Y) - camera_position;
     camera.single_mut().target_focus += difference * 0.25;
 }
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bevy::prelude::{Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
-use crate::generation_options::{GenerationAssets, GenerationOptions};
+use crate::generation_options::GenerationOptions;
 use crate::mesh_generation::generate_mesh;
 use crate::voxel_generation::generate_voxels;
 
@@ -20,7 +20,7 @@ impl DefaultVoxelWorld {
 }
 
 pub trait VoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 3], generation_assets: Arc<GenerationAssets>) -> (Option<ChunkTaskData>, bool, [i32; 3]);
+    fn generate_chunk(chunk_position: [i32; 3], generation_options: Arc<GenerationOptions>) -> (Option<ChunkTaskData>, bool, [i32; 3]);
     fn has_chunk(&self, chunk_position: [i32; 3]) -> bool;
     fn add_chunk(&mut self, chunk_position: [i32; 3]) -> bool;
     fn remove_chunk(&mut self, chunk_position: [i32; 3]) -> bool;
@@ -29,8 +29,8 @@ pub trait VoxelWorld {
 impl Resource for DefaultVoxelWorld {}
 
 impl VoxelWorld for DefaultVoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 3], generation_assets: Arc<GenerationAssets>) -> (Option<ChunkTaskData>, bool, [i32; 3]) {
-        let mesh = generate_mesh(generate_voxels(chunk_position, &GenerationOptions::get_options(generation_assets)));
+    fn generate_chunk(chunk_position: [i32; 3], generation_options: Arc<GenerationOptions>) -> (Option<ChunkTaskData>, bool, [i32; 3]) {
+        let mesh = generate_mesh(generate_voxels(chunk_position, &generation_options));
 
         return (match mesh.0 {
             None => None,

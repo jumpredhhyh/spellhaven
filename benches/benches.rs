@@ -1,23 +1,20 @@
-use std::sync::Arc;
+use std::time::Duration;
 use brunch::{Bench, benches};
-use spellhaven::generation_options::{GenerationAssets, GenerationOptions};
+use spellhaven::generation_options::{GenerationOptions, GenerationOptionsResource};
 use spellhaven::mesh_generation::generate_mesh;
-use spellhaven::voxel_generation::{generate_voxels, vox_data_to_structure_data};
+use spellhaven::voxel_generation::generate_voxels;
 
 fn main() {
-    let arc = Arc::new(GenerationAssets {
-        tree: vox_data_to_structure_data(&vox_format::from_file("assets/tree.vox").unwrap()),
-        tree_house: vox_data_to_structure_data(&vox_format::from_file("assets/tree_house.vox").unwrap()),
-    });
-    let voxels = generate_voxels([0, 0, 0], &GenerationOptions::get_options(Arc::clone(&arc)));
+    let arc = GenerationOptionsResource::default().0;
+    let voxels = generate_voxels([0, 0, 0], &arc);
 
     benches!(
         inline:
 
-        Bench::new("voxel_generation")
-            .run(|| generate_voxels([0, 0, 0], &GenerationOptions::get_options(Arc::clone(&arc)))),
+        Bench::new("voxel_generation").with_timeout(Duration::from_secs(20))
+            .run(|| generate_voxels([0, 0, 0], &arc)),
 
-        Bench::new("mesh_generation")
+        Bench::new("mesh_generation").with_timeout(Duration::from_secs(20))
             .run(|| generate_mesh(voxels)),
     );
 }

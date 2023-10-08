@@ -5,8 +5,7 @@ use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
 use crate::animations::SpawnAnimation;
 use crate::chunk_loader::ChunkLoaderPlugin;
-use crate::generation_options::GenerationAssets;
-use crate::voxel_generation::vox_data_to_structure_data;
+use crate::generation_options::GenerationOptionsResource;
 use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
 
 pub const LEVEL_OF_DETAIL: i32 = 1;
@@ -44,9 +43,6 @@ impl BlockType {
 
 pub struct ChunkGenerationPlugin;
 
-#[derive(Resource)]
-pub struct ChunkGenerationAssets(pub Arc<GenerationAssets>);
-
 pub struct ChunkTaskPool(pub TaskPool);
 
 impl Resource for ChunkTaskPool {}
@@ -59,20 +55,17 @@ impl Plugin for ChunkGenerationPlugin {
             .add_systems(Update, set_generated_chunks)
             .insert_resource(DefaultVoxelWorld::default())
             .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
-            .insert_resource(ChunkGenerationAssets(Arc::new(GenerationAssets {
-                tree: vox_data_to_structure_data(&vox_format::from_file("assets/tree.vox").unwrap()),
-                tree_house: vox_data_to_structure_data(&vox_format::from_file("assets/tree_house.vox").unwrap()),
-            })));
+            .insert_resource(GenerationOptionsResource::default());
     }
 }
 
 fn setup(
     mut commands: Commands,
     mut voxel_world: ResMut<DefaultVoxelWorld>,
-    generation_assets: Res<ChunkGenerationAssets>,
+    generation_options: Res<GenerationOptionsResource>,
     task_pool: Res<ChunkTaskPool>
 ) {
-    let size = 5;
+    let size = 1;
 
     for x in -size..size + 1 {
         for z in -size..size + 1 {
@@ -81,13 +74,16 @@ fn setup(
             }
 
             let chunk_position = [x, 0, z];
-            let generation_assets = Arc::clone(&generation_assets.0);
+            let generation_options = Arc::clone(&generation_options.0);
 
             let task = task_pool.0.spawn(async move {
-                DefaultVoxelWorld::generate_chunk(chunk_position, generation_assets)
+                DefaultVoxelWorld::generate_chunk(chunk_position, generation_options)
             });
 
-            commands.spawn(ChunkGenerationTask(task, chunk_position));
+            commands.spawn((
+                ChunkGenerationTask(task, chunk_position),
+                Name::new("Chunk [".to_owned() + &x.to_string() + ", 0, " + &z.to_string() + "]")
+            ));
         }
     }
 }
@@ -104,21 +100,24 @@ fn set_generated_chunks(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut voxel_world: ResMut<DefaultVoxelWorld>,
-    generation_assets: Res<ChunkGenerationAssets>,
+    generation_options: Res<GenerationOptionsResource>,
     task_pool: Res<ChunkTaskPool>
 ){
     for (entity, mut task) in &mut chunks {
         if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
             if chunk_task_data_option.1 {
                 let new_chunk_pos: [i32; 3] = [chunk_task_data_option.2[0], chunk_task_data_option.2[1] + 1, chunk_task_data_option.2[2]];
-                let generation_assets = Arc::clone(&generation_assets.0);
+                let generation_options = Arc::clone(&generation_options.0);
 
                 if voxel_world.add_chunk(new_chunk_pos) {
                     let task = task_pool.0.spawn(async move {
-                        DefaultVoxelWorld::generate_chunk(new_chunk_pos, generation_assets)
+                        DefaultVoxelWorld::generate_chunk(new_chunk_pos, generation_options)
                     });
 
-                    commands.spawn(ChunkGenerationTask(task, new_chunk_pos));
+                    commands.spawn((
+                        ChunkGenerationTask(task, new_chunk_pos),
+                        Name::new("Chunk [".to_owned() + &new_chunk_pos[0].to_string() + ", " + &new_chunk_pos[1].to_string() + ", " + &new_chunk_pos[2].to_string() + "]")
+                    ));
                 }
             }
 

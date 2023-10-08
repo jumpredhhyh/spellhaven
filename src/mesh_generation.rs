@@ -7,6 +7,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut triangles: Vec<[u32; 3]> = Vec::new();
     let mut colors: Vec<[f32; 4]> = Vec::new();
 
@@ -50,6 +51,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5]
                     ]);
 
+                    normals.extend_from_slice(&[
+                       [0., 1., 0.],
+                       [0., 1., 0.],
+                       [0., 1., 0.],
+                       [0., 1., 0.],
+                    ]);
+
                     triangles.extend_from_slice(&[[
                             positions_count + 0,
                             positions_count + (if rotate_quad {2} else {3}),
@@ -80,6 +88,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
                         [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5]
+                    ]);
+
+                    normals.extend_from_slice(&[
+                        [0., -1., 0.],
+                        [0., -1., 0.],
+                        [0., -1., 0.],
+                        [0., -1., 0.],
                     ]);
 
                     triangles.extend_from_slice(&[[
@@ -114,6 +129,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5]
                     ]);
 
+                    normals.extend_from_slice(&[
+                        [1., 0., 0.],
+                        [1., 0., 0.],
+                        [1., 0., 0.],
+                        [1., 0., 0.],
+                    ]);
+
                     triangles.extend_from_slice(&[[
                         positions_count + 0,
                         positions_count + (if rotate_quad {2} else {3}),
@@ -144,6 +166,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
                         [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
                         [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5]
+                    ]);
+
+                    normals.extend_from_slice(&[
+                        [-1., 0., 0.],
+                        [-1., 0., 0.],
+                        [-1., 0., 0.],
+                        [-1., 0., 0.],
                     ]);
 
                     triangles.extend_from_slice(&[[
@@ -178,6 +207,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5]
                     ]);
 
+                    normals.extend_from_slice(&[
+                        [0., 0., 1.],
+                        [0., 0., 1.],
+                        [0., 0., 1.],
+                        [0., 0., 1.],
+                    ]);
+
                     triangles.extend_from_slice(&[[
                         positions_count + 0,
                         positions_count + (if rotate_quad {2} else {3}),
@@ -210,6 +246,13 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5]
                     ]);
 
+                    normals.extend_from_slice(&[
+                        [0., 0., -1.],
+                        [0., 0., -1.],
+                        [0., 0., -1.],
+                        [0., 0., -1.],
+                    ]);
+
                     triangles.extend_from_slice(&[[
                         positions_count + 0,
                         positions_count + 1,
@@ -222,6 +265,10 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                 }
             }
         }
+    }
+
+    if triangles.is_empty() {
+        return (None, generate_more);
     }
 
     for position in positions.iter_mut() {
@@ -244,17 +291,10 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
         Mesh::ATTRIBUTE_POSITION,
         positions
     );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.set_indices(Some(Indices::U32(mesh_triangles)));
-
-    mesh.duplicate_vertices();
-
-    mesh.compute_flat_normals();
-
-    if triangles.is_empty() {
-        return (None, generate_more);
-    }
 
     (Some((mesh, collider_positions, triangles)), generate_more)
 }
