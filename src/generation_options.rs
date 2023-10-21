@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use bevy::prelude::Resource;
-use noise::Abs;
+use bracket_noise::prelude::FastNoise;
+use bracket_noise::prelude::NoiseType::WhiteNoise;
 use vox_format::VoxData;
 use crate::chunk_generation::BlockType;
 use crate::voxel_generation::StructureGenerator;
-use crate::white_noise::WhiteNoise;
 
 #[derive(Resource)]
 pub struct GenerationOptionsResource(pub Arc<GenerationOptions>);
@@ -20,7 +20,7 @@ impl Default for GenerationOptionsResource {
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: Arc::new(Abs::new(WhiteNoise::new(1))),
+                        noise: get_seeded_white_noise(1),
                         generation_size: [30, 30],
                         grid_offset: [15, 15],
                         generate_debug_blocks: false
@@ -28,7 +28,7 @@ impl Default for GenerationOptionsResource {
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: Arc::new(Abs::new(WhiteNoise::new(2))),
+                        noise: get_seeded_white_noise(2),
                         generation_size: [30, 30],
                         grid_offset: [0, 0],
                         generate_debug_blocks: false
@@ -36,7 +36,7 @@ impl Default for GenerationOptionsResource {
                     StructureGenerator {
                         model: tree_house.0.clone(),
                         model_size: tree_house.1,
-                        noise: Arc::new(Abs::new(WhiteNoise::new(3))),
+                        noise: get_seeded_white_noise(3),
                         generation_size: [1000, 1000],
                         grid_offset: [7, 11],
                         generate_debug_blocks: false
@@ -45,6 +45,13 @@ impl Default for GenerationOptionsResource {
             }),
         }
     }
+}
+
+fn get_seeded_white_noise(seed: u64) -> FastNoise {
+    let mut noise = FastNoise::seeded(seed);
+    noise.set_noise_type(WhiteNoise);
+    noise.set_frequency(0.1);
+    noise
 }
 
 pub struct GenerationOptions {

@@ -1,5 +1,6 @@
 use std::sync::Arc;
-use noise::{Cache, Fbm, MultiFractal, NoiseFn, Perlin};
+use bracket_noise::prelude::FastNoise;
+use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, LEVEL_OF_DETAIL};
@@ -10,7 +11,7 @@ use crate::roughness::Roughness;
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
     pub model_size: [i32; 3],
-    pub noise: Arc<dyn NoiseFn<f64, 2> + Send + Sync>,
+    pub noise: FastNoise,
     pub generation_size: [i32; 2],
     pub grid_offset: [i32; 2],
     pub generate_debug_blocks: bool,
@@ -52,7 +53,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             for structure in &generation_options.structures {
                 let structure_offset_x = (total_x + structure.grid_offset[0]).div_floor(structure.generation_size[0]);
                 let structure_offset_z = (total_z + structure.grid_offset[1]).div_floor(structure.generation_size[1]);
-                let structure_value = structure.noise.get([structure_offset_x as f64, structure_offset_z as f64]);
+                let structure_value = structure.noise.get_noise(structure_offset_x as f32, structure_offset_z as f32) * 0.5 + 0.5;
                 if structure.generate_debug_blocks {
                     blocks[x][(noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1][z] = BlockType::Gray(((structure_value) * 255.) as u8);
                 }
