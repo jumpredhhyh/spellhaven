@@ -81,7 +81,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                         }
                         let structure_block = sub_structure[structure_z as usize];
                         if structure_block == BlockType::Air { continue; }
-                        if noise_height as usize + index - min_height as usize >= CHUNK_SIZE[1] + 2 {
+                        if noise_height as usize + index - min_height as usize >= CHUNK_SIZE[1] + 1 {
                             generate_more = true;
                             break;
                         }
