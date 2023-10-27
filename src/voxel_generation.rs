@@ -15,6 +15,7 @@ pub struct StructureGenerator {
     pub generation_size: [i32; 2],
     pub grid_offset: [i32; 2],
     pub generate_debug_blocks: bool,
+    pub debug_rgb_multiplier: [f32; 3],
     //pub height_offset: i32
 }
 
@@ -51,41 +52,50 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             }
 
             for structure in &generation_options.structures {
-                let structure_offset_x = (total_x + structure.grid_offset[0]).div_floor(structure.generation_size[0]);
-                let structure_offset_z = (total_z + structure.grid_offset[1]).div_floor(structure.generation_size[1]);
+                let structure_offset_x = (total_x + structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL)).div_floor(structure.generation_size[0].div_floor(LEVEL_OF_DETAIL));
+                let structure_offset_z = (total_z + structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL)).div_floor(structure.generation_size[1].div_floor(LEVEL_OF_DETAIL));
                 let structure_value = structure.noise.get_noise(structure_offset_x as f32, structure_offset_z as f32) * 0.5 + 0.5;
                 if structure.generate_debug_blocks {
-                    blocks[x][(noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1][z] = BlockType::Gray(((structure_value) * 255.) as u8);
+                    let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1;
+                    let current_color = match blocks[x][top_terrain][z] {
+                        BlockType::StructureDebug(r, g, b) => (r, g, b),
+                        _ => (0u8, 0u8, 0u8)
+                    };
+                    blocks[x][top_terrain][z] = BlockType::StructureDebug(((structure_value) * structure.debug_rgb_multiplier[0] * 255.) as u8 + current_color.0, ((structure_value) * structure.debug_rgb_multiplier[1] * 255.) as u8 + current_color.1, ((structure_value) * structure.debug_rgb_multiplier[2] * 255.) as u8 + current_color.2)
                 }
                 let mut rand = StdRng::seed_from_u64((structure_value.abs() * 10000.) as u64);
 
                 if structure_value > 0. {
-                    let random_x = rand.gen_range(0..=structure.generation_size[0] - structure.model_size[0]);
-                    let random_z = rand.gen_range(0..=structure.generation_size[1] - structure.model_size[2]);
+                    let random_x = rand.gen_range(0..=structure.generation_size[0].div_floor(LEVEL_OF_DETAIL) - structure.model_size[0].div_floor(LEVEL_OF_DETAIL));
+                    let random_z = rand.gen_range(0..=structure.generation_size[1].div_floor(LEVEL_OF_DETAIL) - structure.model_size[2].div_floor(LEVEL_OF_DETAIL));
 
-                    let structure_x = (total_x + structure.grid_offset[0] - structure_offset_x * structure.generation_size[0]).abs() - random_x;
-                    let structure_z = (total_z + structure.grid_offset[1] - structure_offset_z * structure.generation_size[1]).abs() - random_z;
+                    let structure_x = ((total_x + structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL) - structure_offset_x * structure.generation_size[0].div_floor(LEVEL_OF_DETAIL)).abs() - random_x) * LEVEL_OF_DETAIL;
+                    let structure_z = ((total_z + structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL) - structure_offset_z * structure.generation_size[1].div_floor(LEVEL_OF_DETAIL)).abs() - random_z) * LEVEL_OF_DETAIL;
 
                     if structure_x < 0 || structure_z < 0 || structure_x >= structure.model_size[0] || structure_z >= structure.model_size[2] {
                         continue;
                     }
 
-                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0] + (structure.model_size[0] / 2) - structure.grid_offset[0] + random_x;
-                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1] + (structure.model_size[2] / 2) - structure.grid_offset[1] + random_z;
+                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0].div_floor(LEVEL_OF_DETAIL) + (structure.model_size[0].div_floor(LEVEL_OF_DETAIL) / 2) - structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL) + random_x;
+                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1].div_floor(LEVEL_OF_DETAIL) + (structure.model_size[2].div_floor(LEVEL_OF_DETAIL) / 2) - structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL) + random_z;
 
                     let noise_height = noise.get([structure_noise_height_x as f64, structure_noise_height_z as f64]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
-                        if (noise_height as i32 - min_height + index as i32) < 0 {
+                        if index % LEVEL_OF_DETAIL as usize != 0 {
+                            continue;
+                        }
+                        let chunk_index = index.div_floor(LEVEL_OF_DETAIL as usize);
+                        if (noise_height as i32 - min_height + chunk_index as i32) < 0 {
                             continue;
                         }
                         let structure_block = sub_structure[structure_z as usize];
                         if structure_block == BlockType::Air { continue; }
-                        if noise_height as usize + index - min_height as usize >= CHUNK_SIZE[1] + 1 {
+                        if noise_height as usize + chunk_index - min_height as usize >= CHUNK_SIZE[1] + 1 {
                             generate_more = true;
                             break;
                         }
-                        blocks[x][noise_height as usize + index - min_height as usize][z] = structure_block;
+                        blocks[x][noise_height as usize + chunk_index - min_height as usize][z] = structure_block;
                     }
                 }
             }

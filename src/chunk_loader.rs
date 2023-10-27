@@ -1,10 +1,8 @@
-use std::sync::Arc;
 use bevy::log::warn;
-use bevy::prelude::{App, Commands, Component, Entity, Name, Or, Plugin, Query, Res, ResMut, Transform, Update, Vec3, With};
+use bevy::prelude::{App, Commands, Component, Entity, Or, Plugin, Query, ResMut, Transform, Update, Vec3, With};
 use crate::animations::DespawnAnimation;
-use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkTaskPool, VOXEL_SIZE};
-use crate::generation_options::GenerationOptionsResource;
-use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
+use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkGenerator, VOXEL_SIZE};
+use crate::voxel_world::{DefaultVoxelWorld, MAX_LOD, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
 
@@ -17,37 +15,34 @@ impl Plugin for ChunkLoaderPlugin {
 #[derive(Component)]
 pub struct ChunkLoader{
     pub load_range: i32,
-    pub unload_range: i32
+    pub unload_range: i32,
+    pub lod_range: [f32; MAX_LOD as usize + 1]
+}
+
+impl Default for ChunkLoader {
+    fn default() -> Self {
+        Self {
+            load_range: 15,
+            unload_range: 20,
+            lod_range: [5., 10., 20., 40.],
+        }
+    }
 }
 
 fn load_chunks(
     mut voxel_world: ResMut<DefaultVoxelWorld>,
     mut commands: Commands,
-    generation_options: Res<GenerationOptionsResource>,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
-    task_pool: Res<ChunkTaskPool>
 ) {
     for (chunk_loader, transform) in &chunk_loaders {
         let loader_chunk_pos = get_chunk_position(transform.translation);
 
         for x in -chunk_loader.load_range..chunk_loader.load_range + 1 {
             for z in -chunk_loader.load_range..chunk_loader.load_range + 1 {
-                let chunk_position = [loader_chunk_pos[0] + x, 0, loader_chunk_pos[1] + z];
-
-                if !voxel_world.add_chunk(chunk_position) {
-                    continue;
+                let chunk_pos = [loader_chunk_pos[0] + x, 0, loader_chunk_pos[1] + z];
+                if !voxel_world.has_chunk(chunk_pos) {
+                    commands.spawn(ChunkGenerator(chunk_pos));
                 }
-                let generation_options = Arc::clone(&generation_options.0);
-
-                let task = task_pool.0.spawn(async move {
-                    DefaultVoxelWorld::generate_chunk(chunk_position, generation_options)
-                });
-
-
-                commands.spawn((
-                    ChunkGenerationTask(task, chunk_position),
-                    Name::new("Chunk [".to_owned() + &chunk_position[0].to_string() + ", 0, " + &chunk_position[2].to_string() + "]")
-                ));
             }
         }
     }

@@ -25,7 +25,8 @@ pub enum BlockType {
     Grass,
     Sand,
     Gray(u8),
-    Custom(u8, u8, u8)
+    Custom(u8, u8, u8),
+    StructureDebug(u8, u8, u8),
 }
 
 impl BlockType {
@@ -36,7 +37,8 @@ impl BlockType {
             BlockType::Grass => [55. / 255., 195. /255., 95. / 255., 1.],
             BlockType::Gray(value) => [*value as f32 / 255., *value as f32 / 255., *value as f32 / 255., 1.],
             BlockType::Sand => [225. / 255., 195. / 255., 90. / 255., 1.],
-            BlockType::Custom(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.]
+            BlockType::Custom(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
+            BlockType::StructureDebug(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.]
         }
     }
 }
@@ -52,7 +54,7 @@ impl Plugin for ChunkGenerationPlugin {
         app
             .add_plugins(ChunkLoaderPlugin)
             .add_systems(Startup, setup)
-            .add_systems(Update, set_generated_chunks)
+            .add_systems(Update, (set_generated_chunks, start_generating_chunks))
             .insert_resource(DefaultVoxelWorld::default())
             .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
             .insert_resource(GenerationOptionsResource::default());
@@ -61,29 +63,12 @@ impl Plugin for ChunkGenerationPlugin {
 
 fn setup(
     mut commands: Commands,
-    mut voxel_world: ResMut<DefaultVoxelWorld>,
-    generation_options: Res<GenerationOptionsResource>,
-    task_pool: Res<ChunkTaskPool>
 ) {
     let size = 1;
 
     for x in -size..size + 1 {
         for z in -size..size + 1 {
-            if !voxel_world.add_chunk([x, 0, z]) {
-                continue;
-            }
-
-            let chunk_position = [x, 0, z];
-            let generation_options = Arc::clone(&generation_options.0);
-
-            let task = task_pool.0.spawn(async move {
-                DefaultVoxelWorld::generate_chunk(chunk_position, generation_options)
-            });
-
-            commands.spawn((
-                ChunkGenerationTask(task, chunk_position),
-                Name::new("Chunk [".to_owned() + &x.to_string() + ", 0, " + &z.to_string() + "]")
-            ));
+            commands.spawn(ChunkGenerator([x, 0, z]));
         }
     }
 }
@@ -94,31 +79,50 @@ pub struct ChunkGenerationTask(pub Task<(Option<ChunkTaskData>, bool, [i32; 3])>
 #[derive(Component)]
 pub struct Chunk(pub [i32; 3]);
 
+#[derive(Component)]
+pub struct ChunkGenerator(pub [i32; 3]);
+
+fn start_generating_chunks(
+    mut commands: Commands,
+    mut voxel_world: ResMut<DefaultVoxelWorld>,
+    chunk_generators: Query<(Entity, &ChunkGenerator)>,
+    generation_options: Res<GenerationOptionsResource>,
+    task_pool: Res<ChunkTaskPool>
+) {
+    for (entity, chunk_generator) in &chunk_generators {
+        if !voxel_world.add_chunk(chunk_generator.0) {
+            commands.entity(entity).despawn();
+
+            continue;
+        }
+
+        let generation_options = Arc::clone(&generation_options.0);
+        let chunk_pos = chunk_generator.0;
+
+        let task = task_pool.0.spawn(async move {
+            DefaultVoxelWorld::generate_chunk(chunk_pos, generation_options)
+        });
+
+        commands.entity(entity).insert((
+            ChunkGenerationTask(task, chunk_generator.0),
+            Name::new("Chunk [".to_owned() + &chunk_generator.0[0].to_string() + ", " + &chunk_generator.0[1].to_string() + ", " + &chunk_generator.0[2].to_string() + "]")
+        ));
+
+        commands.entity(entity).remove::<ChunkGenerator>();
+    }
+}
+
 fn set_generated_chunks(
     mut commands: Commands,
     mut chunks: Query<(Entity, &mut ChunkGenerationTask)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut voxel_world: ResMut<DefaultVoxelWorld>,
-    generation_options: Res<GenerationOptionsResource>,
-    task_pool: Res<ChunkTaskPool>
 ){
     for (entity, mut task) in &mut chunks {
         if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
             if chunk_task_data_option.1 {
                 let new_chunk_pos: [i32; 3] = [chunk_task_data_option.2[0], chunk_task_data_option.2[1] + 1, chunk_task_data_option.2[2]];
-                let generation_options = Arc::clone(&generation_options.0);
-
-                if voxel_world.add_chunk(new_chunk_pos) {
-                    let task = task_pool.0.spawn(async move {
-                        DefaultVoxelWorld::generate_chunk(new_chunk_pos, generation_options)
-                    });
-
-                    commands.spawn((
-                        ChunkGenerationTask(task, new_chunk_pos),
-                        Name::new("Chunk [".to_owned() + &new_chunk_pos[0].to_string() + ", " + &new_chunk_pos[1].to_string() + ", " + &new_chunk_pos[2].to_string() + "]")
-                    ));
-                }
+                commands.spawn(ChunkGenerator(new_chunk_pos));
             }
 
             if chunk_task_data_option.0.is_some() {

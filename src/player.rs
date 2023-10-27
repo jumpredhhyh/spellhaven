@@ -62,10 +62,7 @@ fn setup(
             ..default()
         },
         Player{velocity: Vec3::ZERO, jumped: false},
-        ChunkLoader{
-            unload_range: 20,
-            load_range: 15
-        },
+        ChunkLoader::default(),
         Name::new("Player")
     ));
 

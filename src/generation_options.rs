@@ -23,7 +23,8 @@ impl Default for GenerationOptionsResource {
                         noise: get_seeded_white_noise(1),
                         generation_size: [30, 30],
                         grid_offset: [15, 15],
-                        generate_debug_blocks: false
+                        generate_debug_blocks: false,
+                        debug_rgb_multiplier: [1., 0., 0.],
                     },
                     StructureGenerator {
                         model: tree.0.clone(),
@@ -31,7 +32,8 @@ impl Default for GenerationOptionsResource {
                         noise: get_seeded_white_noise(2),
                         generation_size: [30, 30],
                         grid_offset: [0, 0],
-                        generate_debug_blocks: false
+                        generate_debug_blocks: false,
+                        debug_rgb_multiplier: [0., 1., 0.],
                     },
                     StructureGenerator {
                         model: tree_house.0.clone(),
@@ -39,7 +41,8 @@ impl Default for GenerationOptionsResource {
                         noise: get_seeded_white_noise(3),
                         generation_size: [1000, 1000],
                         grid_offset: [7, 11],
-                        generate_debug_blocks: false
+                        generate_debug_blocks: false,
+                        debug_rgb_multiplier: [1., 1., 1.],
                     }
                 ]
             }),
