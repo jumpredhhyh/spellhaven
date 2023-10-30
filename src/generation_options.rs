@@ -23,7 +23,7 @@ impl Default for GenerationOptionsResource {
                         noise: get_seeded_white_noise(1),
                         generation_size: [30, 30],
                         grid_offset: [15, 15],
-                        generate_debug_blocks: false,
+                        generate_debug_blocks: true,
                         debug_rgb_multiplier: [1., 0., 0.],
                     },
                     StructureGenerator {

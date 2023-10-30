@@ -57,7 +57,7 @@ impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
 impl<R> NoiseFn<f64, 2usize> for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     fn get(&self, point: [f64; 2]) -> f64 {
         let roughness = self.roughness.get(point);
-        fractal_noise(point[0], point[1], self.frequency, self.amplitude, self.octaves, self.lacunarity, self.persistence + roughness, &self.permutation_table)
+        fractal_noise(point[0], point[1], self.frequency, self.amplitude, self.octaves, self.lacunarity, self.persistence + roughness, &self.permutation_table).max(2.)
     }
 }
 

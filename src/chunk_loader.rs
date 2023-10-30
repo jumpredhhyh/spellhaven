@@ -2,7 +2,7 @@ use bevy::log::warn;
 use bevy::prelude::{App, Commands, Component, Entity, Or, Plugin, Query, ResMut, Transform, Update, Vec3, With};
 use crate::animations::DespawnAnimation;
 use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkGenerator, VOXEL_SIZE};
-use crate::voxel_world::{DefaultVoxelWorld, MAX_LOD, VoxelWorld};
+use crate::voxel_world::{DefaultVoxelWorld, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
 
@@ -16,7 +16,7 @@ impl Plugin for ChunkLoaderPlugin {
 pub struct ChunkLoader{
     pub load_range: i32,
     pub unload_range: i32,
-    pub lod_range: [f32; MAX_LOD as usize + 1]
+    pub lod_range: [f32; MAX_LOD.usize()]
 }
 
 impl Default for ChunkLoader {
@@ -24,13 +24,13 @@ impl Default for ChunkLoader {
         Self {
             load_range: 15,
             unload_range: 20,
-            lod_range: [5., 10., 20., 40.],
+            lod_range: [5., 10., 20., 40., 80., 160., 320.],
         }
     }
 }
 
 fn load_chunks(
-    mut voxel_world: ResMut<DefaultVoxelWorld>,
+    voxel_world: ResMut<QuadTreeVoxelWorld>,
     mut commands: Commands,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
 ) {
@@ -49,7 +49,7 @@ fn load_chunks(
 }
 
 fn unload_chunks(
-    mut voxel_world: ResMut<DefaultVoxelWorld>,
+    mut voxel_world: ResMut<QuadTreeVoxelWorld>,
     mut commands: Commands,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
     chunks: Query<(Entity, Option<&Chunk>, Option<&ChunkGenerationTask>), Or<(With<Chunk>, With<ChunkGenerationTask>)>>
@@ -104,5 +104,5 @@ fn unload_chunks(
 }
 
 fn get_chunk_position(global_position: Vec3) -> [i32; 2] {
-    [(global_position.x / (CHUNK_SIZE[0] as f32 * VOXEL_SIZE)).floor() as i32, (global_position.z / (CHUNK_SIZE[2] as f32 * VOXEL_SIZE)).floor() as i32]
+    [(global_position.x / (CHUNK_SIZE[0] as f32 * VOXEL_SIZE * MAX_LOD.multiplier_f32())).floor() as i32, (global_position.z / (CHUNK_SIZE[2] as f32 * VOXEL_SIZE * MAX_LOD.multiplier_f32())).floor() as i32]
 }

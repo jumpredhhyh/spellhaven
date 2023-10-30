@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use rand::Rng;
 use crate::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
+use crate::voxel_world::ChunkLod;
 
-pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool)) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
+pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool), chunk_lod: ChunkLod) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -272,9 +273,9 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     }
 
     for position in positions.iter_mut() {
-        position[0] = position[0] * VOXEL_SIZE;
-        position[1] = (position[1] + min_height as f32) * VOXEL_SIZE;
-        position[2] = position[2] * VOXEL_SIZE;
+        position[0] = position[0] * VOXEL_SIZE * chunk_lod.multiplier_f32();
+        position[1] = (position[1] + min_height as f32) * VOXEL_SIZE * chunk_lod.multiplier_f32();
+        position[2] = position[2] * VOXEL_SIZE * chunk_lod.multiplier_f32();
     }
 
     let mut mesh_triangles: Vec<u32> = Vec::new();

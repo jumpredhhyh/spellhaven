@@ -2,6 +2,7 @@ use std::time::Instant;
 use spellhaven::generation_options::{GenerationOptions, GenerationOptionsResource};
 use spellhaven::mesh_generation::generate_mesh;
 use spellhaven::voxel_generation::generate_voxels;
+use spellhaven::voxel_world::ChunkLod;
 
 fn main() {
     let data = GenerationOptionsResource::default().0;
@@ -9,11 +10,11 @@ fn main() {
 
     instant = time_stamp(instant);
 
-    let chunk = generate_voxels([0, 0, 0], &data);
+    let chunk = generate_voxels([38, 0, 9], &data, ChunkLod::Sixtyfourth);
 
     instant = time_stamp(instant);
 
-    let _mesh = generate_mesh(chunk);
+    let _mesh = generate_mesh(chunk, ChunkLod::Sixtyfourth);
 
     time_stamp(instant);
 }

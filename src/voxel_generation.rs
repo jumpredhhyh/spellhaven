@@ -3,10 +3,11 @@ use bracket_noise::prelude::FastNoise;
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
-use crate::chunk_generation::{BlockType, CHUNK_SIZE, LEVEL_OF_DETAIL};
+use crate::chunk_generation::{BlockType, CHUNK_SIZE};
 use crate::fractal_open_simplex::FractalOpenSimplex;
 use crate::generation_options::GenerationOptions;
 use crate::roughness::Roughness;
+use crate::voxel_world::ChunkLod;
 
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
@@ -19,18 +20,18 @@ pub struct StructureGenerator {
     //pub height_offset: i32
 }
 
-pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOptions) -> ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool) {
+pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOptions, chunk_lod: ChunkLod) -> ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool) {
     let mut blocks = [[[BlockType::Air; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2];
-    let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12) * LEVEL_OF_DETAIL as f64);
+    let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12) * chunk_lod.f64());
 
     let noise = FractalOpenSimplex::new(
         0,
-        0.5f64.powi(9) * LEVEL_OF_DETAIL as f64,
-        256. / LEVEL_OF_DETAIL as f64,
+        0.5f64.powi(9) * chunk_lod.f64(),
+        256. / chunk_lod.f64(),
         7,
         2.,
         0.5,
-        Roughness::new(1, 0.5f64.powi(10) * LEVEL_OF_DETAIL as f64, 0.2 / LEVEL_OF_DETAIL as f64)
+        Roughness::new(1, 0.5f64.powi(10) * chunk_lod.f64(), 0.2 / chunk_lod.f64())
     );
 
     let (terrain_height, min_height) = generate_chunk_noise(&position, &noise);
@@ -52,8 +53,8 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             }
 
             for structure in &generation_options.structures {
-                let structure_offset_x = (total_x + structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL)).div_floor(structure.generation_size[0].div_floor(LEVEL_OF_DETAIL));
-                let structure_offset_z = (total_z + structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL)).div_floor(structure.generation_size[1].div_floor(LEVEL_OF_DETAIL));
+                let structure_offset_x = (total_x + structure.grid_offset[0].div_floor(chunk_lod.i32())).div_floor(structure.generation_size[0].div_floor(chunk_lod.i32()));
+                let structure_offset_z = (total_z + structure.grid_offset[1].div_floor(chunk_lod.i32())).div_floor(structure.generation_size[1].div_floor(chunk_lod.i32()));
                 let structure_value = structure.noise.get_noise(structure_offset_x as f32, structure_offset_z as f32) * 0.5 + 0.5;
                 if structure.generate_debug_blocks {
                     let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1;
@@ -66,26 +67,26 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                 let mut rand = StdRng::seed_from_u64((structure_value.abs() * 10000.) as u64);
 
                 if structure_value > 0. {
-                    let random_x = rand.gen_range(0..=structure.generation_size[0].div_floor(LEVEL_OF_DETAIL) - structure.model_size[0].div_floor(LEVEL_OF_DETAIL));
-                    let random_z = rand.gen_range(0..=structure.generation_size[1].div_floor(LEVEL_OF_DETAIL) - structure.model_size[2].div_floor(LEVEL_OF_DETAIL));
+                    let random_x = rand.gen_range(0..=structure.generation_size[0].div_floor(chunk_lod.i32()) - structure.model_size[0].div_floor(chunk_lod.i32()));
+                    let random_z = rand.gen_range(0..=structure.generation_size[1].div_floor(chunk_lod.i32()) - structure.model_size[2].div_floor(chunk_lod.i32()));
 
-                    let structure_x = ((total_x + structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL) - structure_offset_x * structure.generation_size[0].div_floor(LEVEL_OF_DETAIL)).abs() - random_x) * LEVEL_OF_DETAIL;
-                    let structure_z = ((total_z + structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL) - structure_offset_z * structure.generation_size[1].div_floor(LEVEL_OF_DETAIL)).abs() - random_z) * LEVEL_OF_DETAIL;
+                    let structure_x: i32 = ((total_x + structure.grid_offset[0].div_floor(chunk_lod.i32()) - structure_offset_x * structure.generation_size[0].div_floor(chunk_lod.i32())).abs() - random_x) * chunk_lod.i32();
+                    let structure_z: i32 = ((total_z + structure.grid_offset[1].div_floor(chunk_lod.i32()) - structure_offset_z * structure.generation_size[1].div_floor(chunk_lod.i32())).abs() - random_z) * chunk_lod.i32();
 
                     if structure_x < 0 || structure_z < 0 || structure_x >= structure.model_size[0] || structure_z >= structure.model_size[2] {
                         continue;
                     }
 
-                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0].div_floor(LEVEL_OF_DETAIL) + (structure.model_size[0].div_floor(LEVEL_OF_DETAIL) / 2) - structure.grid_offset[0].div_floor(LEVEL_OF_DETAIL) + random_x;
-                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1].div_floor(LEVEL_OF_DETAIL) + (structure.model_size[2].div_floor(LEVEL_OF_DETAIL) / 2) - structure.grid_offset[1].div_floor(LEVEL_OF_DETAIL) + random_z;
+                    let structure_noise_height_x = structure_offset_x * structure.generation_size[0].div_floor(chunk_lod.i32()) + (structure.model_size[0].div_floor(chunk_lod.i32()) / 2) - structure.grid_offset[0].div_floor(chunk_lod.i32()) + random_x;
+                    let structure_noise_height_z = structure_offset_z * structure.generation_size[1].div_floor(chunk_lod.i32()) + (structure.model_size[2].div_floor(chunk_lod.i32()) / 2) - structure.grid_offset[1].div_floor(chunk_lod.i32()) + random_z;
 
                     let noise_height = noise.get([structure_noise_height_x as f64, structure_noise_height_z as f64]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
-                        if index % LEVEL_OF_DETAIL as usize != 0 {
+                        if index % chunk_lod.usize() != 0 {
                             continue;
                         }
-                        let chunk_index = index.div_floor(LEVEL_OF_DETAIL as usize);
+                        let chunk_index = index.div_floor(chunk_lod.usize());
                         if (noise_height as i32 - min_height + chunk_index as i32) < 0 {
                             continue;
                         }
@@ -121,5 +122,5 @@ fn generate_chunk_noise<N>(position: &[i32; 3], noise: &N) -> ([[f64; CHUNK_SIZE
         }
     }
 
-    (result, min as i32 - 2 + position[1] * CHUNK_SIZE[1] as i32)
+    (result, (min as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32)
 }

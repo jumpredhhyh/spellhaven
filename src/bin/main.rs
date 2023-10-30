@@ -10,6 +10,7 @@ use spellhaven::chunk_generation::ChunkGenerationPlugin;
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
 use spellhaven::player::PlayerPlugin;
+use spellhaven::voxel_world::ChunkLod;
 
 fn main() {
     App::new()
@@ -21,10 +22,10 @@ fn main() {
             RapierPhysicsPlugin::<NoUserData>::default(),
             //RapierDebugRenderPlugin::default(),
             ScreenDiagsTextPlugin,
-            PlayerPlugin,
+            //PlayerPlugin,
             WireframePlugin,
             AnimationPlugin,
-            //BirdCameraPlugin,
+            BirdCameraPlugin,
             WorldInspectorPlugin::new()
         ))
         .add_systems(Startup, setup)

@@ -6,11 +6,12 @@ use futures_lite::future;
 use crate::animations::SpawnAnimation;
 use crate::chunk_loader::ChunkLoaderPlugin;
 use crate::generation_options::GenerationOptionsResource;
-use crate::voxel_world::{DefaultVoxelWorld, VoxelWorld};
+use crate::voxel_world;
+use crate::voxel_world::{DefaultVoxelWorld, QuadTreeVoxelWorld, VoxelWorld};
 
-pub const LEVEL_OF_DETAIL: i32 = 1;
+//pub const LEVEL_OF_DETAIL: i32 = 1;
 pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
-pub const VOXEL_SIZE: f32 = 0.5 * LEVEL_OF_DETAIL as f32;
+pub const VOXEL_SIZE: f32 = 0.5;
 
 pub struct ChunkTaskData{
     pub mesh: Mesh,
@@ -54,8 +55,9 @@ impl Plugin for ChunkGenerationPlugin {
         app
             .add_plugins(ChunkLoaderPlugin)
             .add_systems(Startup, setup)
-            .add_systems(Update, (set_generated_chunks, start_generating_chunks))
-            .insert_resource(DefaultVoxelWorld::default())
+            .add_systems(Update, set_generated_chunks)
+            .add_systems(Update, start_generating_chunks)
+            .insert_resource(QuadTreeVoxelWorld::default())
             .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
             .insert_resource(GenerationOptionsResource::default());
     }
@@ -84,7 +86,7 @@ pub struct ChunkGenerator(pub [i32; 3]);
 
 fn start_generating_chunks(
     mut commands: Commands,
-    mut voxel_world: ResMut<DefaultVoxelWorld>,
+    mut voxel_world: ResMut<QuadTreeVoxelWorld>,
     chunk_generators: Query<(Entity, &ChunkGenerator)>,
     generation_options: Res<GenerationOptionsResource>,
     task_pool: Res<ChunkTaskPool>
@@ -100,7 +102,7 @@ fn start_generating_chunks(
         let chunk_pos = chunk_generator.0;
 
         let task = task_pool.0.spawn(async move {
-            DefaultVoxelWorld::generate_chunk(chunk_pos, generation_options)
+            QuadTreeVoxelWorld::generate_chunk(chunk_pos, generation_options)
         });
 
         commands.entity(entity).insert((
