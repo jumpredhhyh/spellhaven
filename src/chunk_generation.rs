@@ -4,10 +4,10 @@ use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
 use crate::animations::SpawnAnimation;
-use crate::chunk_loader::ChunkLoaderPlugin;
+use crate::chunk_loader::{ChunkLoader, ChunkLoaderPlugin, get_chunk_position};
 use crate::generation_options::GenerationOptionsResource;
 use crate::voxel_world;
-use crate::voxel_world::{DefaultVoxelWorld, QuadTreeVoxelWorld, VoxelWorld};
+use crate::voxel_world::{ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
 pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
@@ -56,7 +56,7 @@ impl Plugin for ChunkGenerationPlugin {
             .add_plugins(ChunkLoaderPlugin)
             .add_systems(Startup, setup)
             .add_systems(Update, set_generated_chunks)
-            .add_systems(Update, start_generating_chunks)
+            .add_systems(Update, start_generating_quadtree_chunks)
             .insert_resource(QuadTreeVoxelWorld::default())
             .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
             .insert_resource(GenerationOptionsResource::default());
@@ -84,12 +84,13 @@ pub struct Chunk(pub [i32; 3]);
 #[derive(Component)]
 pub struct ChunkGenerator(pub [i32; 3]);
 
-fn start_generating_chunks(
+fn start_generating_quadtree_chunks(
     mut commands: Commands,
     mut voxel_world: ResMut<QuadTreeVoxelWorld>,
     chunk_generators: Query<(Entity, &ChunkGenerator)>,
     generation_options: Res<GenerationOptionsResource>,
-    task_pool: Res<ChunkTaskPool>
+    task_pool: Res<ChunkTaskPool>,
+    chunk_loaders: Query<(&ChunkLoader, &Transform)>,
 ) {
     for (entity, chunk_generator) in &chunk_generators {
         if !voxel_world.add_chunk(chunk_generator.0) {
@@ -98,20 +99,54 @@ fn start_generating_chunks(
             continue;
         }
 
-        let generation_options = Arc::clone(&generation_options.0);
-        let chunk_pos = chunk_generator.0;
+        generate_quad_tree_chunk(entity, MAX_LOD, [0, 0], chunk_generator.0, &chunk_loaders, &task_pool.0, &generation_options, &mut commands);
 
-        let task = task_pool.0.spawn(async move {
-            QuadTreeVoxelWorld::generate_chunk(chunk_pos, generation_options)
-        });
-
-        commands.entity(entity).insert((
-            ChunkGenerationTask(task, chunk_generator.0),
+        commands.entity(entity).insert(
             Name::new("Chunk [".to_owned() + &chunk_generator.0[0].to_string() + ", " + &chunk_generator.0[1].to_string() + ", " + &chunk_generator.0[2].to_string() + "]")
-        ));
+       );
 
         commands.entity(entity).remove::<ChunkGenerator>();
     }
+}
+
+fn generate_quad_tree_chunk(parent: Entity, current_lod: ChunkLod, current_lod_pos: [i32; 2], parent_chunk_pos: [i32; 3], chunk_loaders: &Query<(&ChunkLoader, &Transform)>, task_pool: &TaskPool, generation_options: &Res<GenerationOptionsResource>, commands: &mut Commands) {
+    let mut divide = false;
+
+    if current_lod != ChunkLod::Full {
+        for (chunk_loader, transform) in chunk_loaders {
+            let loader_chunk_position = get_chunk_position(transform.translation, current_lod);
+            let current_chunk_pos = [parent_chunk_pos[0] * current_lod.inverse_multiplier_i32() + current_lod_pos[0], parent_chunk_pos[2] * current_lod.inverse_multiplier_i32() + current_lod_pos[1]];
+            let position_difference = [loader_chunk_position[0] - current_chunk_pos[0], loader_chunk_position[1] - current_chunk_pos[1]];
+            let current_range = chunk_loader.lod_range[MAX_LOD.usize() - current_lod.usize()];
+            if position_difference[0].abs() <= current_range && position_difference[1].abs() <= current_range {
+                divide = true;
+            }
+        }
+    }
+
+    if divide {
+        generate_quad_tree_chunk(parent, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2], parent_chunk_pos, chunk_loaders, task_pool, generation_options, commands);
+        generate_quad_tree_chunk(parent, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2], parent_chunk_pos, chunk_loaders, task_pool, generation_options, commands);
+        generate_quad_tree_chunk(parent, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2 + 1], parent_chunk_pos, chunk_loaders, task_pool, generation_options, commands);
+        generate_quad_tree_chunk(parent, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2 + 1], parent_chunk_pos, chunk_loaders, task_pool, generation_options, commands);
+        return;
+    }
+
+    let generation_options = Arc::clone(&generation_options.0);
+
+    let task = task_pool.spawn(async move {
+        QuadTreeVoxelWorld::generate_chunk(parent_chunk_pos, current_lod, current_lod_pos, generation_options)
+    });
+
+    let child = commands.spawn((
+        ChunkGenerationTask(task, parent_chunk_pos),
+        Name::new(format!("SubChunk[lod: {current_lod:?}, pos:{current_lod_pos:?}]")),
+        Visibility::Visible
+    )).id();
+
+    commands.entity(parent).insert(SpatialBundle::default());
+
+    commands.entity(parent).add_child(child);
 }
 
 fn set_generated_chunks(

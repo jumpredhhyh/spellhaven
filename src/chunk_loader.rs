@@ -1,8 +1,8 @@
 use bevy::log::warn;
-use bevy::prelude::{App, Commands, Component, Entity, Or, Plugin, Query, ResMut, Transform, Update, Vec3, With};
+use bevy::prelude::{App, Commands, Component, DespawnRecursiveExt, Entity, Or, Plugin, Query, ResMut, Transform, Update, Vec3, With};
 use crate::animations::DespawnAnimation;
 use crate::chunk_generation::{Chunk, CHUNK_SIZE, ChunkGenerationTask, ChunkGenerator, VOXEL_SIZE};
-use crate::voxel_world::{DefaultVoxelWorld, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
+use crate::voxel_world::{ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
 
@@ -16,15 +16,15 @@ impl Plugin for ChunkLoaderPlugin {
 pub struct ChunkLoader{
     pub load_range: i32,
     pub unload_range: i32,
-    pub lod_range: [f32; MAX_LOD.usize()]
+    pub lod_range: [i32; MAX_LOD.usize() - 1]
 }
 
 impl Default for ChunkLoader {
     fn default() -> Self {
         Self {
-            load_range: 15,
+            load_range: 8,
             unload_range: 20,
-            lod_range: [5., 10., 20., 40., 80., 160., 320.],
+            lod_range: [4, 4, 4],
         }
     }
 }
@@ -35,7 +35,7 @@ fn load_chunks(
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
 ) {
     for (chunk_loader, transform) in &chunk_loaders {
-        let loader_chunk_pos = get_chunk_position(transform.translation);
+        let loader_chunk_pos = get_chunk_position(transform.translation, MAX_LOD);
 
         for x in -chunk_loader.load_range..chunk_loader.load_range + 1 {
             for z in -chunk_loader.load_range..chunk_loader.load_range + 1 {
@@ -73,7 +73,7 @@ fn unload_chunks(
             }
             Some(chunk_position) => {
                 for (chunk_loader, chunk_loader_transform) in &chunk_loaders {
-                    let loader_chunk_pos = get_chunk_position(chunk_loader_transform.translation);
+                    let loader_chunk_pos = get_chunk_position(chunk_loader_transform.translation, MAX_LOD);
                     if (chunk_position[0] - loader_chunk_pos[0]).abs() < chunk_loader.unload_range && (chunk_position[2] - loader_chunk_pos[1]).abs() < chunk_loader.unload_range {
                         should_unload = false;
                         break;
@@ -94,7 +94,7 @@ fn unload_chunks(
                     match chunk_task_option {
                         None => {}
                         Some(_) => {
-                            commands.entity(entity).despawn();
+                            commands.entity(entity).despawn_recursive();
                         }
                     }
                 }
@@ -103,6 +103,6 @@ fn unload_chunks(
     }
 }
 
-fn get_chunk_position(global_position: Vec3) -> [i32; 2] {
-    [(global_position.x / (CHUNK_SIZE[0] as f32 * VOXEL_SIZE * MAX_LOD.multiplier_f32())).floor() as i32, (global_position.z / (CHUNK_SIZE[2] as f32 * VOXEL_SIZE * MAX_LOD.multiplier_f32())).floor() as i32]
+pub fn get_chunk_position(global_position: Vec3, lod: ChunkLod) -> [i32; 2] {
+    [(global_position.x / (CHUNK_SIZE[0] as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor() as i32, (global_position.z / (CHUNK_SIZE[2] as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor() as i32]
 }

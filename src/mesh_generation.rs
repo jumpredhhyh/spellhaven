@@ -273,9 +273,9 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     }
 
     for position in positions.iter_mut() {
-        position[0] = position[0] * VOXEL_SIZE * chunk_lod.multiplier_f32();
-        position[1] = (position[1] + min_height as f32) * VOXEL_SIZE * chunk_lod.multiplier_f32();
-        position[2] = position[2] * VOXEL_SIZE * chunk_lod.multiplier_f32();
+        position[0] = (position[0] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
+        position[1] = (position[1] + min_height as f32 - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
+        position[2] = (position[2] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
     }
 
     let mut mesh_triangles: Vec<u32> = Vec::new();
