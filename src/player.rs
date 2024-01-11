@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
 use crate::chunk_generation::{VOXEL_SIZE};
@@ -50,7 +49,7 @@ fn setup(
     // Player
     commands.spawn((
         RigidBody::KinematicPositionBased,
-        TransformBundle::from_transform(Transform::from_xyz(0., 200., 0.)),
+        TransformBundle::from_transform(Transform::from_xyz(0., 400., 0.)),
         Collider::cuboid(0.4, 0.9, 0.4),
         KinematicCharacterController {
             offset: CharacterLength::Absolute(0.01),
@@ -72,7 +71,7 @@ fn setup(
             ..default()
         },
         PanOrbitCamera::default(),
-        AtmosphereCamera::default(),
+        //AtmosphereCamera::default(),
         PlayerCamera,
         Name::new("PlayerCamera")
     ));

@@ -13,3 +13,4 @@ pub mod bird_camera;
 pub mod generation_options;
 pub mod fractal_open_simplex;
 pub mod roughness;
+pub mod quad_tree_data;

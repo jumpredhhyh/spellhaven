@@ -1,6 +1,6 @@
 use bevy::app::App;
 use bevy::hierarchy::DespawnRecursiveExt;
-use bevy::prelude::{Commands, Component, Entity, Plugin, Query, Res, Time, Transform, Update, Vec3};
+use bevy::prelude::{Commands, Component, Entity, Plugin, Query, Res, Time, Transform, Update, Vec3, With, Without};
 
 pub struct AnimationPlugin;
 
@@ -40,8 +40,13 @@ fn animate_spawn_animation(
 fn animate_despawn_animation(
     mut commands: Commands,
     time: Res<Time>,
-    mut despawn_animations: Query<(Entity, &mut Transform, &mut DespawnAnimation)>
+    mut despawn_animations: Query<(Entity, &mut Transform, &mut DespawnAnimation)>,
+    mut despawn_animations_no_transform: Query<Entity, (With<DespawnAnimation>, Without<Transform>)>
 ) {
+    for entity in &mut despawn_animations_no_transform {
+        commands.entity(entity).despawn_recursive();
+    }
+
     for (entity, mut transform, mut despawn_animation) in &mut despawn_animations {
         if despawn_animation.0 == 0. && despawn_animation.1.is_none() {
             despawn_animation.1 = Some(transform.translation);

@@ -7,7 +7,7 @@ use crate::chunk_generation::{BlockType, CHUNK_SIZE};
 use crate::fractal_open_simplex::FractalOpenSimplex;
 use crate::generation_options::GenerationOptions;
 use crate::roughness::Roughness;
-use crate::voxel_world::{ChunkLod, MAX_LOD};
+use crate::voxel_world::ChunkLod;
 
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
@@ -70,8 +70,8 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let random_x = rand.gen_range(0..=structure.generation_size[0] - structure.model_size[0]);
                     let random_z = rand.gen_range(0..=structure.generation_size[1] - structure.model_size[2]);
 
-                    let structure_x: i32 = ((total_x + structure.grid_offset[0] - structure_offset_x * structure.generation_size[0]).abs() - random_x);
-                    let structure_z: i32 = ((total_z + structure.grid_offset[1] - structure_offset_z * structure.generation_size[1]).abs() - random_z);
+                    let structure_x: i32 = (total_x + structure.grid_offset[0] - structure_offset_x * structure.generation_size[0]).abs() - random_x;
+                    let structure_z: i32 = (total_z + structure.grid_offset[1] - structure_offset_z * structure.generation_size[1]).abs() - random_z;
 
                     if structure_x < 0 || structure_z < 0 || structure_x >= structure.model_size[0] || structure_z >= structure.model_size[2] {
                         continue;

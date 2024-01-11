@@ -21,17 +21,16 @@ inherits = "release"
 debug = true
 
 [dependencies]
-bevy = { version = "0.11.3" }
-bevy_panorbit_camera = "0.8.0"
+bevy = { version = "0.12.1" }
+bevy_panorbit_camera = "0.10.0"
 rand = "0.8.5"
 futures-lite = "1.13.0"
 noise = "0.8"
-bevy_atmosphere = "0.7.0"
-bevy_screen_diags = "0.6.0"
+bevy_atmosphere = "0.8.1"
 fastrand = { version = "2.0.1", features = [] }
-bevy_rapier3d = { version = "0.22.0", features = [ "simd-stable", "debug-render-3d" ] }
+bevy_rapier3d = { version = "0.23.0", features = [ "simd-stable", "debug-render-3d" ] }
 vox-format = "0.1.0"
-bevy-inspector-egui = "0.20.0"
+bevy-inspector-egui = "0.22.1"
 bracket-noise = "0.8.7"
 
 [dev-dependencies]

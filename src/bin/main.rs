@@ -4,13 +4,11 @@ use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
-use bevy_rapier3d::prelude::{NoUserData, RapierDebugRenderPlugin, RapierPhysicsPlugin};
-use bevy_screen_diags::ScreenDiagsTextPlugin;
+use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use spellhaven::chunk_generation::ChunkGenerationPlugin;
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
 use spellhaven::player::PlayerPlugin;
-use spellhaven::voxel_world::ChunkLod;
 
 fn main() {
     App::new()
@@ -21,7 +19,6 @@ fn main() {
             AtmospherePlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
             //RapierDebugRenderPlugin::default(),
-            ScreenDiagsTextPlugin,
             //PlayerPlugin,
             WireframePlugin,
             AnimationPlugin,
@@ -31,13 +28,14 @@ fn main() {
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {
             global: false,
+            default_color: Color::RED,
         })
         .run();
 }
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    _asset_server: Res<AssetServer>,
 ) {
     commands.spawn((
         DirectionalLightBundle {

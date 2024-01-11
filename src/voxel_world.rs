@@ -1,18 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use bevy::prelude::{Resource, Transform};
+use bevy::prelude::{Entity, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
 use crate::generation_options::GenerationOptions;
 use crate::mesh_generation::generate_mesh;
+use crate::quad_tree_data::QuadTreeNode;
 use crate::voxel_generation::generate_voxels;
 
 pub const MAX_LOD: ChunkLod = ChunkLod::Eighth;
-
-fn chunk_pos_to_quad_tree_pos(chunk_pos: [i32; 3]) -> [i32; 2] {
-    let divider = 2i32.pow(MAX_LOD.u32());
-    [chunk_pos[0].div_floor(divider), chunk_pos[2].div_floor(divider)]
-}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ChunkLod {
@@ -23,6 +19,12 @@ pub enum ChunkLod {
     Sixteenth = 5,
     Thirtytwoth = 6,
     Sixtyfourth = 7,
+}
+
+impl From<ChunkLod> for i32 {
+    fn from(value: ChunkLod) -> Self {
+        value as Self
+    }
 }
 
 impl ChunkLod {
@@ -53,11 +55,12 @@ impl ChunkLod {
 }
 
 pub struct QuadTreeVoxelWorld {
-    chunk_trees: HashMap<[i32; 3], bool>
+    chunk_trees: HashMap<[i32; 2], Box<Option<QuadTreeNode<HashMap<i32, Entity>>>>>
 }
 
 impl Default for QuadTreeVoxelWorld {
     fn default() -> Self {
+
         Self {
             chunk_trees: HashMap::default()
         }
@@ -65,46 +68,65 @@ impl Default for QuadTreeVoxelWorld {
 }
 
 pub trait VoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 3], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>) -> (Option<ChunkTaskData>, bool, [i32; 3]);
-    fn has_chunk(&self, chunk_position: [i32; 3]) -> bool;
-    fn add_chunk(&mut self, chunk_position: [i32; 3]) -> bool;
-    fn remove_chunk(&mut self, chunk_position: [i32; 3]) -> bool;
+    fn generate_chunk(chunk_position: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult;
+    fn has_chunk(&self, chunk_position: [i32; 2]) -> bool;
+    fn add_chunk(&mut self, chunk_position: [i32; 2], chunk: Option<QuadTreeNode<HashMap<i32, Entity>>>) -> bool;
+    fn remove_chunk(&mut self, chunk_position: [i32; 2]) -> bool;
+    fn get_chunk(&mut self, chunk_position: [i32; 2]) -> Option<&mut Box<Option<QuadTreeNode<HashMap<i32, Entity>>>>>;
 }
 
 impl Resource for QuadTreeVoxelWorld {}
 
+pub struct ChunkGenerationResult {
+    pub task_data: Option<ChunkTaskData>,
+    pub generate_above: bool,
+    pub parent_pos: [i32; 2],
+    pub lod: ChunkLod,
+    pub lod_position: [i32; 2],
+    pub chunk_height: i32
+}
+
 impl VoxelWorld for QuadTreeVoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 3], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>) -> (Option<ChunkTaskData>, bool, [i32; 3]) {
-        let new_chunk_pos = [chunk_position[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_position[1], chunk_position[2] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
+    fn generate_chunk(parent_pos: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult {
+        let new_chunk_pos = [parent_pos[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_height, parent_pos[1] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
         let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod), chunk_lod);
 
-        return (match mesh.0 {
-            None => None,
-            Some(mesh) => Some(ChunkTaskData{
-                transform: Transform::from_xyz(new_chunk_pos[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, -40.0, new_chunk_pos[2] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
-                collider: Collider::trimesh(mesh.1, mesh.2),
-                mesh: mesh.0
-            })
-        }, mesh.1, chunk_position.clone())
+        return ChunkGenerationResult{
+            task_data: match mesh.0 {
+                None => None,
+                Some(mesh) => Some(ChunkTaskData{
+                    transform: Transform::from_xyz(new_chunk_pos[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, -40.0, new_chunk_pos[2] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
+                    collider: Collider::trimesh(mesh.1, mesh.2),
+                    mesh: mesh.0
+                })},
+            generate_above: mesh.1,
+            parent_pos,
+            lod: chunk_lod,
+            lod_position,
+            chunk_height,
+        };
     }
 
-    fn has_chunk(&self, chunk_position: [i32; 3]) -> bool {
-        return self.chunk_trees.contains_key(&chunk_position);
+    fn has_chunk(&self, chunk_position: [i32; 2]) -> bool {
+        let map = self.chunk_trees.get(&chunk_position);
+        map.is_some()
     }
 
-    fn add_chunk(&mut self, chunk_position: [i32; 3]) -> bool {
+    fn add_chunk(&mut self, chunk_position: [i32; 2], chunk: Option<QuadTreeNode<HashMap<i32, Entity>>>) -> bool {
         if self.has_chunk(chunk_position) {
-            return false;
+            return false
         }
 
-        self.chunk_trees.insert(chunk_position, true);
+        self.chunk_trees.insert(chunk_position, Box::new(chunk));
+
         true
     }
 
-    fn remove_chunk(&mut self, chunk_position: [i32; 3]) -> bool {
-        return match self.chunk_trees.remove(&chunk_position) {
-            None => { false }
-            Some(_) => { true }
-        }
+    fn remove_chunk(&mut self, chunk_position: [i32; 2]) -> bool {
+        self.chunk_trees.remove(&chunk_position).is_some()
+    }
+
+    fn get_chunk(&mut self, chunk_position: [i32; 2]) -> Option<&mut Box<Option<QuadTreeNode<HashMap<i32, Entity>>>>> {
+        self.chunk_trees.get_mut(&chunk_position)
     }
 }
