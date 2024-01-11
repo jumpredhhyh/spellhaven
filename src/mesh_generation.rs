@@ -286,7 +286,11 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
         mesh_triangles.push(triangle[2]);
     }
 
-    let collider_positions = positions.clone().iter().map(|position| Vec3::new(position[0], position[1], position[2])).collect();
+    let collider_positions = if chunk_lod == ChunkLod::Full {
+        positions.clone().iter().map(|position| Vec3::new(position[0], position[1], position[2])).collect()
+    } else {
+        Vec::new()
+    };
 
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_POSITION,
@@ -297,7 +301,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.set_indices(Some(Indices::U32(mesh_triangles)));
 
-    (Some((mesh, collider_positions, triangles)), generate_more)
+    (Some((mesh, collider_positions, if chunk_lod == ChunkLod::Full { triangles } else { Vec::new() })), generate_more)
 }
 
 fn all_neighbours(pos: [usize; 3], blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> bool {

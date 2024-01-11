@@ -17,7 +17,7 @@ pub const VOXEL_SIZE: f32 = 0.5;
 pub struct ChunkTaskData{
     pub mesh: Mesh,
     pub transform: Transform,
-    pub collider: Collider
+    pub collider: Option<Collider>
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -327,8 +327,6 @@ fn set_generated_chunks(
                     .entity(entity)
                     .remove::<ChunkGenerationTask>()
                     .insert((
-                        RigidBody::Fixed,
-                        chunk_task_data.collider,
                         PbrBundle {
                             mesh: meshes.add(chunk_task_data.mesh),
                             material: materials.add(Color::rgb(1., 1., 1.).into()),
@@ -338,6 +336,13 @@ fn set_generated_chunks(
                         Chunk([chunk_task_data_option.parent_pos[0], chunk_task_data_option.chunk_height, chunk_task_data_option.parent_pos[1]]),
                         //SpawnAnimation::default()
                     ));
+
+                if chunk_task_data_option.lod == ChunkLod::Full {
+                    commands.entity(entity).insert((
+                        RigidBody::Fixed,
+                        chunk_task_data.collider.unwrap(),
+                    ));
+                }
             } else {
                 commands.entity(entity).despawn();
             }
