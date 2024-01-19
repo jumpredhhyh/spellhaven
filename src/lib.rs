@@ -1,4 +1,5 @@
 #![feature(int_roundings)]
+#![feature(map_try_insert)]
 
 extern crate core;
 

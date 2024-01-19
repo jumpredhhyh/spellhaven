@@ -1,14 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::ops::Deref;
+use std::sync::{Arc, RwLock};
+use bevy::log::warn;
 use bevy::prelude::{Entity, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
-use crate::generation_options::GenerationOptions;
+use crate::generation_options::{COUNTRY_SIZE, CountryCache, GenerationOptions};
 use crate::mesh_generation::generate_mesh;
 use crate::quad_tree_data::QuadTreeNode;
 use crate::voxel_generation::generate_voxels;
 
-pub const MAX_LOD: ChunkLod = ChunkLod::Eighth;
+pub const MAX_LOD: ChunkLod = ChunkLod::Sixtyfourth;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ChunkLod {
@@ -88,14 +90,36 @@ pub struct ChunkGenerationResult {
 
 impl VoxelWorld for QuadTreeVoxelWorld {
     fn generate_chunk(parent_pos: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult {
+        let country_pos: [i32; 2] = [parent_pos[0].div_floor(COUNTRY_SIZE[0] / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32)), parent_pos[1].div_floor(COUNTRY_SIZE[1] / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32))];
+        let read = generation_options.country_cache.read().unwrap();
+        let country_cache = match read.get(&country_pos) {
+            None => {
+                drop(read);
+                let mut write = generation_options.country_cache.write().unwrap();
+                match write.get(&country_pos) {
+                    None => {
+                        let cache = CountryCache::default();
+                        write.insert(country_pos, cache.clone());
+                        cache
+                    }
+                    Some(cache) => {
+                        cache.clone()
+                    }
+                }
+            }
+            Some(cache) => {
+                cache.clone()
+            }
+        };
+
         let new_chunk_pos = [parent_pos[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_height, parent_pos[1] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
-        let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod), chunk_lod);
+        let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod, &country_cache), chunk_lod);
 
         return ChunkGenerationResult{
             task_data: match mesh.0 {
                 None => None,
                 Some(mesh) => Some(ChunkTaskData{
-                    transform: Transform::from_xyz(new_chunk_pos[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, -40.0, new_chunk_pos[2] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
+                    transform: Transform::from_xyz(new_chunk_pos[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE, 0.0, new_chunk_pos[2] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE),
                     collider: if chunk_lod == ChunkLod::Full { Some(Collider::trimesh(mesh.1, mesh.2)) } else { None },
                     mesh: mesh.0
                 })},

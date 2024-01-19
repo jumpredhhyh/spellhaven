@@ -48,17 +48,17 @@ impl<T> QuadTreeNode<T> {
             QuadTreeNode::Node(a, b, c, d) => {
                 let divider = 2_i32.pow(depth as u32 - 1);
 
-                if position[0] / divider == 0 {
+                return if position[0] / divider == 0 {
                     if position[1] / divider == 0 {
-                        return a.get_data(depth - 1, position);
+                        a.get_data(depth - 1, position)
                     } else {
-                        return c.get_data(depth - 1, [position[0], position[1] - divider]);
+                        c.get_data(depth - 1, [position[0], position[1] - divider])
                     }
                 } else {
                     if position[1] / divider == 0 {
-                        return b.get_data(depth - 1, [position[0] - divider, position[1]]);
+                        b.get_data(depth - 1, [position[0] - divider, position[1]])
                     } else {
-                        return d.get_data(depth - 1, [position[0] - divider, position[1] - divider]);
+                        d.get_data(depth - 1, [position[0] - divider, position[1] - divider])
                     }
                 }
             }
