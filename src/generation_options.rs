@@ -66,22 +66,41 @@ fn get_seeded_white_noise(seed: u64) -> FastNoise {
 pub struct GenerationOptions {
     pub structures: Vec<StructureGenerator>,
     pub structure_assets: Vec<StructureAsset>,
-    pub country_cache: RwLock<HashMap<[i32; 2], CountryCache>>,
+    pub country_cache: RwLock<HashMap<[i32; 2], Arc<CountryCache>>>,
 }
 
 pub struct StructureAsset(Vec<Vec<Vec<BlockType>>>);
 
 #[derive(Copy, Clone)]
 pub struct CountryCache {
-    pub grass_color: BlockType
+    pub country_pos: [i32; 2],
+    pub grass_color: BlockType,
+    pub start_location: [f32; 2],
+    pub end_location: [f32; 2]
 }
 
-impl Default for CountryCache {
-    fn default() -> Self {
+impl CountryCache {
+    pub fn new(country_pos: [i32; 2]) -> Self {
         let mut rng = rand::thread_rng();
 
+        let min_offset = 100;
+
+        let start_x = rng.gen_range(min_offset..COUNTRY_SIZE[0]-min_offset);
+        let start_z = rng.gen_range(min_offset..COUNTRY_SIZE[1]-min_offset);
+
+        let mut end_x = start_x;
+        let mut end_z = start_z;
+
+        while (end_x - start_x).abs() < 100 || (end_z - start_z).abs() < 100 {
+            end_x = rng.gen_range(min_offset..COUNTRY_SIZE[0]-min_offset);
+            end_z = rng.gen_range(min_offset..COUNTRY_SIZE[1]-min_offset);
+        }
+
         Self {
-            grass_color: Custom(rng.gen(), rng.gen(), rng.gen())
+            country_pos,
+            grass_color: Custom(rng.gen(), rng.gen(), rng.gen()),
+            start_location: [start_x as f32, start_z as f32],
+            end_location: [end_x as f32, end_z as f32]
         }
     }
 }

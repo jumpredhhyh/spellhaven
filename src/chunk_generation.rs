@@ -26,6 +26,7 @@ pub enum BlockType {
     Stone,
     Grass,
     Sand,
+    Path,
     Gray(u8),
     Custom(u8, u8, u8),
     StructureDebug(u8, u8, u8),
@@ -40,7 +41,8 @@ impl BlockType {
             BlockType::Gray(value) => [*value as f32 / 255., *value as f32 / 255., *value as f32 / 255., 1.],
             BlockType::Sand => [225. / 255., 195. / 255., 90. / 255., 1.],
             BlockType::Custom(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
-            BlockType::StructureDebug(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.]
+            BlockType::StructureDebug(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
+            BlockType::Path => [100. / 255., 65. / 255., 50. / 255., 1.]
         }
     }
 }

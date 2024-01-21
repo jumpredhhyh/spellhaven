@@ -7,7 +7,7 @@ use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use crate::chunk_generation::{BlockType, CHUNK_SIZE};
 use crate::fractal_open_simplex::FractalOpenSimplex;
-use crate::generation_options::{CountryCache, GenerationOptions};
+use crate::generation_options::{COUNTRY_SIZE, CountryCache, GenerationOptions};
 use crate::roughness::Roughness;
 use crate::voxel_world::ChunkLod;
 
@@ -66,6 +66,11 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32 * chunk_lod.multiplier_i32();
             let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32 * chunk_lod.multiplier_i32();
 
+            let country_x = total_x % COUNTRY_SIZE[0];
+            let country_z = total_z % COUNTRY_SIZE[1];
+
+            let path_distance = get_min_distance_to_line(country_cache.start_location, country_cache.end_location, [country_x as f32, country_z as f32]);
+
             let dryness = value_noise.get([total_x as f64, total_z as f64]);
 
             let noise_height = terrain_height[x][z];
@@ -74,7 +79,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
             for y in min_height as usize..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f64) as usize {
                 if y == CHUNK_SIZE[1] + 1 + min_height as usize { generate_more = true; }
-                blocks[x][y - min_height as usize][z] = country_cache.grass_color; // /*BlockType::Gray(((country_value + 1.) / 2. * 255.) as u8);*/ if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
+                blocks[x][y - min_height as usize][z] = if path_distance < 100. { BlockType::Path } else { country_cache.grass_color }; // /*BlockType::Gray(((country_value + 1.) / 2. * 255.) as u8);*/ if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
             }
 
             for structure in &generation_options.structures {
@@ -150,4 +155,24 @@ fn generate_chunk_noise<N>(position: &[i32; 3], lod: ChunkLod, noise: &N, noise2
     }
 
     (result, (min as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32)
+}
+
+fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> f32 {
+    let length_squared = (line_end[0] - line_start[0]).powi(2) + (line_end[1] - line_start[1]).powi(2);
+    if length_squared == 0. {
+        return distance(line_start, point);
+    }
+
+    let t = (dot([point[0] - line_start[0], point[1] - line_start[1]], [line_end[0] - line_start[0], line_end[1] - line_start[1]]) / length_squared).clamp(0., 1.);
+    let projection = [line_start[0] + t * (line_end[0] - line_start[0]), line_start[1] + t * (line_end[1] - line_start[1])];
+
+    distance(point, projection)
+}
+
+fn distance(p1: [f32; 2], p2: [f32; 2]) -> f32 {
+    ((p2[0] - p1[0]).powi(2) + (p2[1] - p1[1]).powi(2)).sqrt()
+}
+
+fn dot(p1: [f32; 2], p2: [f32; 2]) -> f32 {
+    p1[0] * p2[0] + p1[1] * p2[1]
 }

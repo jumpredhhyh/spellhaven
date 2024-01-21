@@ -88,29 +88,33 @@ pub struct ChunkGenerationResult {
     pub chunk_height: i32
 }
 
+fn get_or_create_country_cache(country_pos: [i32; 2], generation_options: &GenerationOptions) -> Arc<CountryCache> {
+    let read = generation_options.country_cache.read().unwrap();
+    match read.get(&country_pos) {
+        None => {
+            drop(read);
+            let mut write = generation_options.country_cache.write().unwrap();
+            match write.get(&country_pos) {
+                None => {
+                    let cache = Arc::new(CountryCache::new(country_pos));
+                    write.insert(country_pos, cache.clone());
+                    cache
+                }
+                Some(cache) => {
+                    cache.clone()
+                }
+            }
+        }
+        Some(cache) => {
+            cache.clone()
+        }
+    }
+}
+
 impl VoxelWorld for QuadTreeVoxelWorld {
     fn generate_chunk(parent_pos: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult {
         let country_pos: [i32; 2] = [parent_pos[0].div_floor(COUNTRY_SIZE[0] / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32)), parent_pos[1].div_floor(COUNTRY_SIZE[1] / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32))];
-        let read = generation_options.country_cache.read().unwrap();
-        let country_cache = match read.get(&country_pos) {
-            None => {
-                drop(read);
-                let mut write = generation_options.country_cache.write().unwrap();
-                match write.get(&country_pos) {
-                    None => {
-                        let cache = CountryCache::default();
-                        write.insert(country_pos, cache.clone());
-                        cache
-                    }
-                    Some(cache) => {
-                        cache.clone()
-                    }
-                }
-            }
-            Some(cache) => {
-                cache.clone()
-            }
-        };
+        let country_cache = get_or_create_country_cache(country_pos, &generation_options);
 
         let new_chunk_pos = [parent_pos[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_height, parent_pos[1] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
         let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod, &country_cache), chunk_lod);
