@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
-use crate::generation_options::{COUNTRY_SIZE, CountryCache, GenerationOptions};
+use crate::country_cache::COUNTRY_SIZE;
+use crate::generation_options::{GenerationOptions};
 use crate::mesh_generation::generate_mesh;
 use crate::quad_tree_data::QuadTreeNode;
 use crate::voxel_generation::generate_voxels;
@@ -91,57 +91,10 @@ pub struct ChunkGenerationResult {
     pub chunk_height: i32
 }
 
-fn get_or_create_country_cache_rw(country_pos: IVec2, generation_options: &GenerationOptions) -> Arc<RwLock<Option<Arc<CountryCache>>>> {
-    let read = generation_options.country_cache.read().unwrap();
-    match read.get(&country_pos) {
-        None => {
-            drop(read);
-            let mut write = generation_options.country_cache.write().unwrap();
-            let result = match write.get(&country_pos) {
-                None => {
-                    let lock = Arc::new(RwLock::new(None));
-                    write.insert(country_pos, lock);
-                    write.get(&country_pos).unwrap().clone()
-                }
-                Some(cache) => {
-                    cache.clone()
-                }
-            };
-            drop(write);
-            result
-        }
-        Some(cache) => {
-            cache.clone()
-        }
-    }
-}
-
-fn get_or_create_country_cache(country_cache_rw: Arc<RwLock<Option<Arc<CountryCache>>>>, country_pos: IVec2) -> Arc<CountryCache> {
-    let read = country_cache_rw.read().unwrap();
-    match read.deref() {
-        None => {
-            drop(read);
-            let mut write = country_cache_rw.write().unwrap();
-            match write.deref() {
-                None => {
-                    write.insert(Arc::new(CountryCache::new(country_pos))).clone()
-                }
-                Some(country_cache) => {
-                    country_cache.clone()
-                }
-            }
-        }
-        Some(country_cache) => {
-            country_cache.clone()
-        }
-    }
-}
-
 impl VoxelWorld for QuadTreeVoxelWorld {
     fn generate_chunk(parent_pos: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult {
         let country_pos = IVec2::new(parent_pos[0].div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32)), parent_pos[1].div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32)));
-        let country_cache_rw = get_or_create_country_cache_rw(country_pos, &generation_options);
-        let country_cache = get_or_create_country_cache(country_cache_rw, country_pos);
+        let country_cache = generation_options.country_cache.get_cache_entry(country_pos, generation_options.clone());
 
         let new_chunk_pos = [parent_pos[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_height, parent_pos[1] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
         let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod, &country_cache), chunk_lod);

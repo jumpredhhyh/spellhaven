@@ -8,8 +8,9 @@ use noise::core::worley::ReturnType;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use crate::chunk_generation::{BlockType, CHUNK_SIZE};
+use crate::country_cache::{COUNTRY_SIZE, CountryCache, PathLine};
 use crate::fractal_open_simplex::FractalOpenSimplex;
-use crate::generation_options::{COUNTRY_SIZE, CountryCache, GenerationOptions};
+use crate::generation_options::GenerationOptions;
 use crate::roughness::Roughness;
 use crate::voxel_world::ChunkLod;
 
@@ -48,20 +49,18 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
     let mut generate_more: bool = false;
 
+    let all_paths = vec![&country_cache.this_path_cache.paths, &country_cache.bottom_path_cache.paths, &country_cache.left_path_cache.paths];
+
     for x in 0..CHUNK_SIZE[0] + 2 {
         for z in 0..CHUNK_SIZE[2] + 2 {
             let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32 * chunk_lod.multiplier_i32();
             let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32 * chunk_lod.multiplier_i32();
 
-            let country_x = total_x.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
-            let country_z = total_z.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
-
             let _dryness = value_noise.get([total_x as f64, total_z as f64]);
 
             let mut noise_height = terrain_height[x][z];
 
-            let (mut path_distance, mut closest_point_on_path, path_direction) = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
-            closest_point_on_path += country_cache.country_pos * COUNTRY_SIZE as i32;
+            let (mut path_distance, closest_point_on_path, path_direction) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths);
             let is_path = path_distance <= 8.75;
 
             path_distance /= 10.;
@@ -113,7 +112,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
                     let country_bounds_check = structure_center - country_cache.country_pos * COUNTRY_SIZE as i32;
                     if country_bounds_check.x >= 0 && country_bounds_check.y >= 0 && country_bounds_check.x < COUNTRY_SIZE as i32 - 1 && country_bounds_check.y < COUNTRY_SIZE as i32 - 1 {
-                        let (a, _, _) = get_min_distance_to_path(IVec2::new(structure_center.x.rem_euclid(COUNTRY_SIZE.try_into().unwrap()), structure_center.y.rem_euclid(COUNTRY_SIZE.try_into().unwrap())), &country_cache.path);
+                        let (a, _, _) = get_min_distance_to_path(structure_center, &all_paths);
 
                         if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
                             continue;
@@ -202,24 +201,28 @@ fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE
     min
 }
 
-fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> (f32, IVec2, Vec2) {
+fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Vec<PathLine>>>) -> (f32, IVec2, Vec2) {
     let mut min: Option<f32> = None;
     let mut closest_point_total = IVec2::ZERO;
     let mut path_direction = Vec2::ZERO;
 
-    for i in 1..path.len() {
-        let (distance, closest_point, direction) = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
-        match min {
-            None => {
-                min = Some(distance);
-                closest_point_total = closest_point;
-                path_direction = direction;
-            }
-            Some(current_min) => {
-                if distance < current_min {
-                    min = Some(distance);
-                    closest_point_total = closest_point;
-                    path_direction = direction;
+    for paths in paths_list {
+        for path in *paths {
+            for line in path {
+                let (distance, closest_point, direction) = get_min_distance_to_line(line.start.as_vec2().to_array(), line.end.as_vec2().to_array(), pos.as_vec2().to_array());
+                match min {
+                    None => {
+                        min = Some(distance);
+                        closest_point_total = closest_point;
+                        path_direction = direction;
+                    }
+                    Some(current_min) => {
+                        if distance < current_min {
+                            min = Some(distance);
+                            closest_point_total = closest_point;
+                            path_direction = direction;
+                        }
+                    }
                 }
             }
         }
