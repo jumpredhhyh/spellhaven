@@ -43,7 +43,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     let mut terrain_height = [[0f32; CHUNK_SIZE[0] + 2]; CHUNK_SIZE[0] + 2];
     get_noise_map(IVec2::new(position[0], position[2]) * IVec2::new(CHUNK_SIZE[0] as i32, CHUNK_SIZE[2] as i32), chunk_lod.multiplier_i32(), &terrain_noise, &mut terrain_height);
 
-    let min_height = (get_min_in_noise_map(&terrain_height) as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32;
+    let min_height = (get_min_in_noise_map(&terrain_height) as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32 - 10 / chunk_lod.multiplier_i32();
 
     let mut generate_more: bool = false;
 
@@ -55,12 +55,20 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             let country_x = total_x.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
             let country_z = total_z.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
 
-            let path_distance = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
-            let is_path = (path_distance / 10.).floor() <= 1.;
-
             let _dryness = value_noise.get([total_x as f64, total_z as f64]);
 
-            let noise_height = terrain_height[x][z];
+            let mut noise_height = terrain_height[x][z];
+
+            let (mut path_distance, mut closest_point_on_path) = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
+            closest_point_on_path += country_cache.country_pos * COUNTRY_SIZE as i32;
+            let is_path = path_distance <= 8.75;
+
+            path_distance /= 10.;
+
+            if path_distance <= 1.75 {
+                let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32 - 1.5;
+                noise_height = lerp(noise_height, path_height, (1.75 - path_distance.powi(2)).clamp(0., 0.9)).round().max(noise_height - 10.);
+            }
 
             let _country_value = country_noise.get([total_x as f64, total_z as f64]);
 
@@ -97,6 +105,17 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let structure_noise_height_x = structure_offset_x * structure.generation_size[0] + (structure.model_size[0] / 2) - structure.grid_offset[0] + random_x;
                     let structure_noise_height_z = structure_offset_z * structure.generation_size[1] + (structure.model_size[2] / 2) - structure.grid_offset[1] + random_z;
 
+                    let structure_center: IVec2 = [structure_noise_height_x, structure_noise_height_z].into();
+
+                    let country_bounds_check = structure_center - country_cache.country_pos * COUNTRY_SIZE as i32;
+                    if country_bounds_check.x >= 0 && country_bounds_check.y >= 0 && country_bounds_check.x < COUNTRY_SIZE as i32 - 1 && country_bounds_check.y < COUNTRY_SIZE as i32 - 1 {
+                        let (a, _) = get_min_distance_to_path(IVec2::new(structure_center.x.rem_euclid(COUNTRY_SIZE.try_into().unwrap()), structure_center.y.rem_euclid(COUNTRY_SIZE.try_into().unwrap())), &country_cache.path);
+
+                        if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
+                            continue;
+                        }
+                    }
+
                     let noise_height = terrain_noise.get([structure_noise_height_x, structure_noise_height_z]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
@@ -123,10 +142,10 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     (blocks, min_height, generate_more)
 }
 
-pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Add<i32, Multiply<i32, Add<i32, FractalOpenSimplex<Roughness>, Constant, 2>, Constant, 2>, Constant, 2>, Add<i32, Multiply<i32, Add<i32, FractalOpenSimplex<Roughness>, Constant, 2>, Constant, 2>, Constant, 2>, 2> {
+pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Multiply<i32, Add<i32, Add<i32, FractalOpenSimplex<Roughness>, FractalOpenSimplex<Roughness>, 2>, Constant, 2>, Constant, 2>, Constant, 2> {
     Add::new(
-        Add::new(
-            Multiply::new(
+        Multiply::new(
+            Add::new(
                 Add::new(
                     FractalOpenSimplex::new(
                         0,
@@ -137,15 +156,6 @@ pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Add<i32, Multiply<i32,
                         0.5,
                         Roughness::new(1, 0.5f64.powi(10), 0.2)
                     ),
-                    Constant::new(-1.)
-                ),
-                Constant::new(1. / chunk_lod.multiplier_f32() as f64)
-            ),
-            Constant::new(1.)
-        ),
-        Add::new(
-            Multiply::new(
-                Add::new(
                     FractalOpenSimplex::new(
                         6,
                         0.5f64.powi(14),
@@ -154,13 +164,13 @@ pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Add<i32, Multiply<i32,
                         2.,
                         0.5,
                         Roughness::new(1, 0.5f64.powi(13), 0.2)
-                    ),
-                    Constant::new(-1.)
+                    )
                 ),
-                Constant::new(1. / chunk_lod.multiplier_f32() as f64)
+                Constant::new(-1.)
             ),
-            Constant::new(1.)
-        )
+            Constant::new(1. / chunk_lod.multiplier_f32() as f64)
+        ),
+        Constant::new(1. + 10. / chunk_lod.multiplier_i32() as f64)
     )
 }
 
@@ -188,36 +198,39 @@ fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE
     min
 }
 
-fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> f32 {
+fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> (f32, IVec2) {
     let mut min: Option<f32> = None;
+    let mut closest_point_total = IVec2::ZERO;
 
     for i in 1..path.len() {
-        let distance = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
+        let (distance, closest_point) = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
         match min {
             None => {
                 min = Some(distance);
+                closest_point_total = closest_point;
             }
             Some(current_min) => {
                 if distance < current_min {
                     min = Some(distance);
+                    closest_point_total = closest_point;
                 }
             }
         }
     }
 
-    min.unwrap_or(f32::INFINITY)
+    (min.unwrap_or(f32::INFINITY), closest_point_total)
 }
 
-fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> f32 {
+fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> (f32, IVec2) {
     let length_squared = (line_end[0] - line_start[0]).powi(2) + (line_end[1] - line_start[1]).powi(2);
     if length_squared == 0. {
-        return distance(line_start, point);
+        return (distance(line_start, point), IVec2::new(line_start[0] as i32, line_start[1] as i32));
     }
 
     let t = (dot([point[0] - line_start[0], point[1] - line_start[1]], [line_end[0] - line_start[0], line_end[1] - line_start[1]]) / length_squared).clamp(0., 1.);
     let projection = [line_start[0] + t * (line_end[0] - line_start[0]), line_start[1] + t * (line_end[1] - line_start[1])];
 
-    distance(point, projection)
+    (distance(point, projection), IVec2::new(projection[0] as i32, projection[1] as i32))
 }
 
 fn distance(p1: [f32; 2], p2: [f32; 2]) -> f32 {
@@ -226,4 +239,8 @@ fn distance(p1: [f32; 2], p2: [f32; 2]) -> f32 {
 
 fn dot(p1: [f32; 2], p2: [f32; 2]) -> f32 {
     p1[0] * p2[0] + p1[1] * p2[1]
+}
+
+fn lerp(a: f32, b: f32, f: f32) -> f32 {
+    a + f * (b - a)
 }
