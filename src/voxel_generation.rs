@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use bevy::math::IVec2;
+use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
 use noise::{Add, Constant, Fbm, MultiFractal, Multiply, NoiseFn, Perlin, Seedable, Turbulence, Worley};
 use noise::core::worley::distance_functions::euclidean;
@@ -59,15 +60,18 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
             let mut noise_height = terrain_height[x][z];
 
-            let (mut path_distance, mut closest_point_on_path) = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
+            let (mut path_distance, mut closest_point_on_path, path_direction) = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
             closest_point_on_path += country_cache.country_pos * COUNTRY_SIZE as i32;
             let is_path = path_distance <= 8.75;
 
             path_distance /= 10.;
 
             if path_distance <= 1.75 {
-                let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32 - 1.5;
-                noise_height = lerp(noise_height, path_height, (1.75 - path_distance.powi(2)).clamp(0., 0.9)).round().max(noise_height - 10.);
+                //let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32 - 1.5;
+
+                let path_height = (terrain_noise.get((closest_point_on_path + (path_direction * 16.).as_ivec2()).to_array()) * 0.5 + terrain_noise.get((closest_point_on_path - (path_direction * 16.).as_ivec2()).to_array()) * 0.5) as f32;
+
+                noise_height = lerp(noise_height, path_height, (1.65 - path_distance.powi(2)).clamp(0., 0.9)).max(noise_height - 10.);
             }
 
             let _country_value = country_noise.get([total_x as f64, total_z as f64]);
@@ -109,7 +113,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
                     let country_bounds_check = structure_center - country_cache.country_pos * COUNTRY_SIZE as i32;
                     if country_bounds_check.x >= 0 && country_bounds_check.y >= 0 && country_bounds_check.x < COUNTRY_SIZE as i32 - 1 && country_bounds_check.y < COUNTRY_SIZE as i32 - 1 {
-                        let (a, _) = get_min_distance_to_path(IVec2::new(structure_center.x.rem_euclid(COUNTRY_SIZE.try_into().unwrap()), structure_center.y.rem_euclid(COUNTRY_SIZE.try_into().unwrap())), &country_cache.path);
+                        let (a, _, _) = get_min_distance_to_path(IVec2::new(structure_center.x.rem_euclid(COUNTRY_SIZE.try_into().unwrap()), structure_center.y.rem_euclid(COUNTRY_SIZE.try_into().unwrap())), &country_cache.path);
 
                         if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
                             continue;
@@ -198,39 +202,43 @@ fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE
     min
 }
 
-fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> (f32, IVec2) {
+fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> (f32, IVec2, Vec2) {
     let mut min: Option<f32> = None;
     let mut closest_point_total = IVec2::ZERO;
+    let mut path_direction = Vec2::ZERO;
 
     for i in 1..path.len() {
-        let (distance, closest_point) = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
+        let (distance, closest_point, direction) = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
         match min {
             None => {
                 min = Some(distance);
                 closest_point_total = closest_point;
+                path_direction = direction;
             }
             Some(current_min) => {
                 if distance < current_min {
                     min = Some(distance);
                     closest_point_total = closest_point;
+                    path_direction = direction;
                 }
             }
         }
     }
 
-    (min.unwrap_or(f32::INFINITY), closest_point_total)
+    (min.unwrap_or(f32::INFINITY), closest_point_total, path_direction)
 }
 
-fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> (f32, IVec2) {
+fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> (f32, IVec2, Vec2) {
     let length_squared = (line_end[0] - line_start[0]).powi(2) + (line_end[1] - line_start[1]).powi(2);
     if length_squared == 0. {
-        return (distance(line_start, point), IVec2::new(line_start[0] as i32, line_start[1] as i32));
+        return (distance(line_start, point), Vec2::from_array(line_start).as_ivec2(), (Vec2::from_array(line_end) - Vec2::from_array(line_start)).normalize());
     }
 
     let t = (dot([point[0] - line_start[0], point[1] - line_start[1]], [line_end[0] - line_start[0], line_end[1] - line_start[1]]) / length_squared).clamp(0., 1.);
     let projection = [line_start[0] + t * (line_end[0] - line_start[0]), line_start[1] + t * (line_end[1] - line_start[1])];
 
-    (distance(point, projection), IVec2::new(projection[0] as i32, projection[1] as i32))
+    let projection_vec = Vec2::from_array(projection);
+    (distance(point, projection), projection_vec.as_ivec2(), (Vec2::from_array(line_end) - projection_vec).normalize())
 }
 
 fn distance(p1: [f32; 2], p2: [f32; 2]) -> f32 {
