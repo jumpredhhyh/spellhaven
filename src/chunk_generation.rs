@@ -42,7 +42,7 @@ impl BlockType {
             BlockType::Sand => [225. / 255., 195. / 255., 90. / 255., 1.],
             BlockType::Custom(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
             BlockType::StructureDebug(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
-            BlockType::Path => [100. / 255., 65. / 255., 50. / 255., 1.]
+            BlockType::Path => [1., 0., 0., 1.] //[100. / 255., 65. / 255., 50. / 255., 1.]
         }
     }
 }
@@ -62,23 +62,10 @@ impl Plugin for ChunkGenerationPlugin {
             .add_systems(Update, start_generating_quadtree_chunks.after(upgrade_quad_trees))
             .add_systems(Update, upgrade_quad_trees.after(set_generated_chunks))
             .insert_resource(QuadTreeVoxelWorld::default())
-            .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(3_000_000).build()))
+            .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(6_000_000).build()))
             .insert_resource(GenerationOptionsResource::default());
     }
 }
-
-// fn setup(
-//     mut commands: Commands,
-//     mut voxel_world: ResMut<QuadTreeVoxelWorld>,
-// ) {
-//     let size = 1;
-//
-//     for x in -size..size + 1 {
-//         for z in -size..size + 1 {
-//             //commands.spawn(ChunkGenerator([x, z]));
-//         }
-//     }
-// }
 
 #[derive(Component)]
 pub struct ChunkGenerationTask(pub Task<ChunkGenerationResult>, pub [i32; 3], pub Entity);

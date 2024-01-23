@@ -42,8 +42,8 @@ impl Seedable for Roughness {
     }
 }
 
-impl NoiseFn<f64, 2usize> for Roughness {
-    fn get(&self, point: [f64; 2]) -> f64 {
-        noise(point[0], point[1], self.frequency, self.amplitude, &self.permutation_table) - 0.15
+impl NoiseFn<i32, 2usize> for Roughness {
+    fn get(&self, point: [i32; 2]) -> f64 {
+        noise(point[0] as f64, point[1]as f64, self.frequency, self.amplitude, &self.permutation_table) - 0.15
     }
 }

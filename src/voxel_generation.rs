@@ -1,6 +1,7 @@
 use std::sync::Arc;
+use bevy::math::IVec2;
 use bracket_noise::prelude::FastNoise;
-use noise::{Add, Fbm, MultiFractal, NoiseFn, Perlin, Seedable, Turbulence, Value, Worley};
+use noise::{Add, Constant, Fbm, MultiFractal, Multiply, NoiseFn, Perlin, Seedable, Turbulence, Worley};
 use noise::core::worley::distance_functions::euclidean;
 use noise::core::worley::ReturnType;
 use rand::prelude::StdRng;
@@ -26,27 +27,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     let mut blocks = [[[BlockType::Air; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2];
     let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12));
 
-    let noise = FractalOpenSimplex::new(
-        0,
-        0.5f64.powi(9),
-        256.,
-        7,
-        2.,
-        0.5,
-        Roughness::new(1, 0.5f64.powi(10), 0.2)
-    );
-
-    let base_mountain_noise = FractalOpenSimplex::new(
-        6,
-        0.5f64.powi(14),
-        4096.,
-        7,
-        2.,
-        0.5,
-        Roughness::new(1, 0.5f64.powi(13), 0.2)
-    );
-
-    let mut country_noise: Turbulence<Worley, Perlin> = Turbulence::new(
+    let country_noise: Turbulence<Worley, Perlin> = Turbulence::new(
         Worley::new(1)
             .set_frequency(0.5f64.powi(11))
             .set_distance_function(&euclidean)
@@ -57,7 +38,12 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     .set_roughness(5)
     .set_seed(2);
 
-    let (terrain_height, min_height) = generate_chunk_noise(&position, chunk_lod, &noise, &base_mountain_noise);
+    let terrain_noise = get_terrain_noise(chunk_lod);
+
+    let mut terrain_height = [[0f32; CHUNK_SIZE[0] + 2]; CHUNK_SIZE[0] + 2];
+    get_noise_map(IVec2::new(position[0], position[2]) * IVec2::new(CHUNK_SIZE[0] as i32, CHUNK_SIZE[2] as i32), chunk_lod.multiplier_i32(), &terrain_noise, &mut terrain_height);
+
+    let min_height = (get_min_in_noise_map(&terrain_height) as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32;
 
     let mut generate_more: bool = false;
 
@@ -66,20 +52,21 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32 * chunk_lod.multiplier_i32();
             let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32 * chunk_lod.multiplier_i32();
 
-            let country_x = total_x % COUNTRY_SIZE[0];
-            let country_z = total_z % COUNTRY_SIZE[1];
+            let country_x = total_x.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
+            let country_z = total_z.rem_euclid(COUNTRY_SIZE.try_into().unwrap());
 
-            let path_distance = get_min_distance_to_line(country_cache.start_location, country_cache.end_location, [country_x as f32, country_z as f32]);
+            let path_distance = get_min_distance_to_path(IVec2::new(country_x, country_z), &country_cache.path);
+            let is_path = (path_distance / 10.).floor() <= 1.;
 
-            let dryness = value_noise.get([total_x as f64, total_z as f64]);
+            let _dryness = value_noise.get([total_x as f64, total_z as f64]);
 
             let noise_height = terrain_height[x][z];
 
-            let country_value = country_noise.get([total_x as f64, total_z as f64]);
+            let _country_value = country_noise.get([total_x as f64, total_z as f64]);
 
-            for y in min_height as usize..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f64) as usize {
+            for y in min_height as usize..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f32) as usize {
                 if y == CHUNK_SIZE[1] + 1 + min_height as usize { generate_more = true; }
-                blocks[x][y - min_height as usize][z] = if path_distance < 100. { BlockType::Path } else { country_cache.grass_color }; // /*BlockType::Gray(((country_value + 1.) / 2. * 255.) as u8);*/ if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
+                blocks[x][y - min_height as usize][z] = if is_path { BlockType::Path } else { country_cache.grass_color }; // /*BlockType::Gray(((country_value + 1.) / 2. * 255.) as u8);*/ if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
             }
 
             for structure in &generation_options.structures {
@@ -87,7 +74,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                 let structure_offset_z = (total_z + structure.grid_offset[1]).div_floor(structure.generation_size[1]);
                 let structure_value = structure.noise.get_noise(structure_offset_x as f32, structure_offset_z as f32) * 0.5 + 0.5;
                 if structure.generate_debug_blocks {
-                    let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f64 + min_height as f64) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1;
+                    let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f32 + min_height as f32) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1;
                     let current_color = match blocks[x][top_terrain][z] {
                         BlockType::StructureDebug(r, g, b) => (r, g, b),
                         _ => (0u8, 0u8, 0u8)
@@ -110,7 +97,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let structure_noise_height_x = structure_offset_x * structure.generation_size[0] + (structure.model_size[0] / 2) - structure.grid_offset[0] + random_x;
                     let structure_noise_height_z = structure_offset_z * structure.generation_size[1] + (structure.model_size[2] / 2) - structure.grid_offset[1] + random_z;
 
-                    let noise_height = (noise.get([structure_noise_height_x as f64, structure_noise_height_z as f64]) / chunk_lod.multiplier_i32() as f64) + (base_mountain_noise.get([structure_noise_height_x as f64, structure_noise_height_z as f64]) / chunk_lod.multiplier_i32() as f64);
+                    let noise_height = terrain_noise.get([structure_noise_height_x, structure_noise_height_z]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
                         if index % chunk_lod.multiplier_i32() as usize != 0 {
@@ -136,25 +123,89 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     (blocks, min_height, generate_more)
 }
 
-fn generate_chunk_noise<N>(position: &[i32; 3], lod: ChunkLod, noise: &N, noise2: &N) -> ([[f64; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[0] + 2], i32) where N: NoiseFn<f64, 2usize> {
-    let mut result = [[0f64; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[0] + 2];
+pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Add<i32, Multiply<i32, Add<i32, FractalOpenSimplex<Roughness>, Constant, 2>, Constant, 2>, Constant, 2>, Add<i32, Multiply<i32, Add<i32, FractalOpenSimplex<Roughness>, Constant, 2>, Constant, 2>, Constant, 2>, 2> {
+    Add::new(
+        Add::new(
+            Multiply::new(
+                Add::new(
+                    FractalOpenSimplex::new(
+                        0,
+                        0.5f64.powi(9),
+                        256.,
+                        7,
+                        2.,
+                        0.5,
+                        Roughness::new(1, 0.5f64.powi(10), 0.2)
+                    ),
+                    Constant::new(-1.)
+                ),
+                Constant::new(1. / chunk_lod.multiplier_f32() as f64)
+            ),
+            Constant::new(1.)
+        ),
+        Add::new(
+            Multiply::new(
+                Add::new(
+                    FractalOpenSimplex::new(
+                        6,
+                        0.5f64.powi(14),
+                        4096.,
+                        7,
+                        2.,
+                        0.5,
+                        Roughness::new(1, 0.5f64.powi(13), 0.2)
+                    ),
+                    Constant::new(-1.)
+                ),
+                Constant::new(1. / chunk_lod.multiplier_f32() as f64)
+            ),
+            Constant::new(1.)
+        )
+    )
+}
 
-    let mut min = f64::MAX;
+pub fn get_noise_map<const SIZE: usize, T: From<i32>, F: NoiseFn<T, 2>>(position: IVec2, zoom_multiplier: i32, noise_fn: &F, array: &mut [[f32; SIZE]; SIZE]) {
+    for x in 0..SIZE {
+        for z in 0..SIZE {
+            let total = position + IVec2::new(x as i32, z as i32) * zoom_multiplier;
+            array[x][z] = noise_fn.get([total.x.into(), total.y.into()]) as f32;
+        }
+    }
+}
 
-    for x in 0..CHUNK_SIZE[0] + 2 {
-        for z in 0..CHUNK_SIZE[2] + 2 {
-            let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32 * lod.multiplier_i32();
-            let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32 * lod.multiplier_i32();
+fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE]; SIZE]) -> T {
+    let mut min = map[0][0];
 
-            let mut noise_height = (noise.get([total_x as f64, total_z as f64]) - 1.) / lod.multiplier_i32() as f64 + 1.;
-            let mountain_noise_height = (noise2.get([total_x as f64, total_z as f64]) - 1.) / lod.multiplier_i32() as f64 + 1.;
-            noise_height += mountain_noise_height;
-            min = min.min(noise_height);
-            result[x][z] = noise_height;
+    for x in 0..SIZE {
+        for z in 0..SIZE {
+            let current = map[x][z];
+            if current < min {
+                min = current;
+            }
         }
     }
 
-    (result, (min as i32).max(2) - 2 + position[1] * CHUNK_SIZE[1] as i32)
+    min
+}
+
+fn get_min_distance_to_path(pos: IVec2, path: &Vec<IVec2>) -> f32 {
+    let mut min: Option<f32> = None;
+
+    for i in 1..path.len() {
+        let distance = get_min_distance_to_line(path[i - 1].as_vec2().to_array(), path[i].as_vec2().to_array(), pos.as_vec2().to_array());
+        match min {
+            None => {
+                min = Some(distance);
+            }
+            Some(current_min) => {
+                if distance < current_min {
+                    min = Some(distance);
+                }
+            }
+        }
+    }
+
+    min.unwrap_or(f32::INFINITY)
 }
 
 fn get_min_distance_to_line(line_start: [f32; 2], line_end: [f32; 2], point: [f32; 2]) -> f32 {

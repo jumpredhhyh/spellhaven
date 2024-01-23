@@ -19,7 +19,8 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 struct Player{
     velocity: Vec3,
-    jumped: bool
+    jumped: bool,
+    fly: bool
 }
 
 #[derive(Component)]
@@ -49,7 +50,7 @@ fn setup(
     // Player
     commands.spawn((
         RigidBody::KinematicPositionBased,
-        TransformBundle::from_transform(Transform::from_xyz(0., 400., 0.)),
+        TransformBundle::from_transform(Transform::from_xyz(0., 2000., 0.)),
         Collider::cuboid(0.4, 0.9, 0.4),
         KinematicCharacterController {
             offset: CharacterLength::Absolute(0.01),
@@ -60,7 +61,7 @@ fn setup(
             }),
             ..default()
         },
-        Player{velocity: Vec3::ZERO, jumped: false},
+        Player{velocity: Vec3::ZERO, jumped: false, fly: true},
         ChunkLoader::default(),
         Name::new("Player")
     ));
@@ -129,6 +130,10 @@ fn movement(
     player_camera: Query<&PanOrbitCamera, With<PlayerCamera>>
 ) {
     for (mut controller, mut player, controller_output) in &mut players {
+        if keyboard_input.just_pressed(KeyCode::F) {
+            player.fly = !player.fly;
+        }
+        
         let mut move_direction = Vec3::ZERO;
         let mut last_movement = player.velocity;
 
@@ -137,7 +142,7 @@ fn movement(
         }
 
         last_movement.x *= 0.8;
-        last_movement.y *= 0.98;
+        last_movement.y *= if player.fly { 0.8 } else { 0.98 };
         last_movement.z *= 0.8;
 
         // Directional movement
@@ -153,13 +158,25 @@ fn movement(
         if keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right) {
             move_direction.x += 1.;
         }
+        if player.fly {
+            if keyboard_input.pressed(KeyCode::E) {
+                move_direction.y += 1.;
+            }
+            if keyboard_input.pressed(KeyCode::Q) {
+                move_direction.y -= 1.;
+            }
+        }
 
-        let movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) { 2. } else { 1. };
+        let mut movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) { 2. } else { 1. };
+
+        if player.fly {
+            movement_speed *= 50.;
+        }
 
         // Rotate vector to camera
         move_direction = Quat::from_rotation_y(player_camera.single().alpha.unwrap_or(0.)).mul_vec3(move_direction.normalize_or_zero() * movement_speed);
 
-        if controller_output.is_some() && !controller_output.unwrap().grounded {
+        if !player.fly && controller_output.is_some() && !controller_output.unwrap().grounded {
             move_direction.y -= 0.4;
         }
 
