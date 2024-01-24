@@ -26,12 +26,48 @@ pub struct StructureCache {
 }
 
 pub struct  PathCache {
-    pub paths: Vec<Vec<PathLine>>
+    pub paths: Vec<Path>
+}
+
+pub struct Path {
+    pub lines: Vec<PathLine>,
+    pub box_pos_start: IVec2,
+    pub box_pos_end: IVec2,
+}
+
+impl Path {
+    pub fn is_in_box(&self, point: IVec2, margin: IVec2) -> bool {
+        let bb_start = self.box_pos_start - margin;
+        let bb_end = self.box_pos_end + margin;
+        !(point.x < bb_start.x || point.x > bb_end.x || point.y < bb_start.y || point.y > bb_end.y)
+    }
 }
 
 pub struct PathLine {
     pub start: IVec2,
     pub end: IVec2,
+    pub box_pos_start: IVec2,
+    pub box_pos_end: IVec2,
+}
+
+impl PathLine {
+    fn new(start: IVec2, end: IVec2) -> Self {
+        let box_pos_start = IVec2::new(start.x.min(end.x), start.y.min(end.y));
+        let box_pos_end = IVec2::new(start.x.max(end.x), start.y.max(end.y));
+
+        Self {
+            start,
+            end,
+            box_pos_start,
+            box_pos_end,
+        }
+    }
+
+    pub fn is_in_box(&self, point: IVec2, margin: IVec2) -> bool {
+        let bb_start = self.box_pos_start - margin;
+        let bb_end = self.box_pos_end + margin;
+        !(point.x < bb_start.x || point.x > bb_end.x || point.y < bb_start.y || point.y > bb_end.y)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -105,7 +141,7 @@ impl GenerationCacheItem<IVec2> for PathCache {
 }
 
 impl PathCache {
-    fn generate_path(mut start_pos: IVec2, mut end_pos: IVec2, country_positions: [IVec2; 2], path_finding_lod: ChunkLod) -> Vec<PathLine> {
+    fn generate_path(mut start_pos: IVec2, mut end_pos: IVec2, country_positions: [IVec2; 2], path_finding_lod: ChunkLod) -> Path {
         start_pos /= path_finding_lod.multiplier_i32();
         end_pos /= path_finding_lod.multiplier_i32();
 
@@ -211,6 +247,18 @@ impl PathCache {
         info!("DONE");
 
         if previous.get(&end_pos).is_some() {
+            let mut min_x = 0;
+            let mut min_y = 0;
+            let mut max_x = 0;
+            let mut max_y = 0;
+
+            let mut check_min_max = |pos: IVec2| {
+                min_x = min_x.min(pos.x);
+                min_y = min_y.min(pos.y);
+                max_x = max_x.max(pos.x);
+                max_y = max_y.max(pos.y);
+            };
+
             let mut current = end_pos;
             let mut path: Vec<PathLine> = vec![];
 
@@ -225,25 +273,41 @@ impl PathCache {
                 let dir = prev - current;
 
                 if dir != direction {
-                    path.push(PathLine {
-                        start: path.last().map(|x| x.end).unwrap_or(prev * path_finding_lod.multiplier_i32()),
-                        end: current * path_finding_lod.multiplier_i32(),
-                    });
+                    let start = path.last().map(|x| x.end).unwrap_or(prev * path_finding_lod.multiplier_i32());
+                    let end = current * path_finding_lod.multiplier_i32();
+                    path.push(PathLine::new(
+                        start,
+                        end
+                    ));
+
+                    check_min_max(start);
+                    check_min_max(end);
                 }
 
                 direction = dir;
 
                 current = prev;
             }
-            path.push(PathLine {
-                start: path.last().map(|x| x.end).unwrap(),
-                end: current * path_finding_lod.multiplier_i32(),
-            });
+            let last = current * path_finding_lod.multiplier_i32();
+            path.push(PathLine::new(
+                path.last().map(|x| x.end).unwrap(),
+                last
+            ));
 
-            path
+            check_min_max(last);
+
+            Path {
+                lines: path,
+                box_pos_start: IVec2::new(min_x, min_y),
+                box_pos_end: IVec2::new(max_x, max_y),
+            }
         } else {
             info!("NO PATH COULD BE CREATED!");
-            vec![]
+            Path {
+                lines: vec![],
+                box_pos_start: Default::default(),
+                box_pos_end: Default::default(),
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ use noise::core::worley::ReturnType;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use crate::chunk_generation::{BlockType, CHUNK_SIZE};
-use crate::country_cache::{COUNTRY_SIZE, CountryCache, PathLine};
+use crate::country_cache::{COUNTRY_SIZE, CountryCache, Path};
 use crate::fractal_open_simplex::FractalOpenSimplex;
 use crate::generation_options::GenerationOptions;
 use crate::roughness::Roughness;
@@ -60,12 +60,12 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
             let mut noise_height = terrain_height[x][z];
 
-            let (mut path_distance, closest_point_on_path, path_direction) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths);
+            let (mut path_distance, closest_point_on_path, path_direction) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths, IVec2::ONE * 15);
             let is_path = path_distance <= 8.75;
 
             path_distance /= 10.;
 
-            if path_distance <= 1.75 {
+            if path_distance <= 1.65 {
                 //let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32 - 1.5;
 
                 let path_height = (terrain_noise.get((closest_point_on_path + (path_direction * 16.).as_ivec2()).to_array()) * 0.5 + terrain_noise.get((closest_point_on_path - (path_direction * 16.).as_ivec2()).to_array()) * 0.5) as f32;
@@ -112,7 +112,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
                     let country_bounds_check = structure_center - country_cache.country_pos * COUNTRY_SIZE as i32;
                     if country_bounds_check.x >= 0 && country_bounds_check.y >= 0 && country_bounds_check.x < COUNTRY_SIZE as i32 - 1 && country_bounds_check.y < COUNTRY_SIZE as i32 - 1 {
-                        let (a, _, _) = get_min_distance_to_path(structure_center, &all_paths);
+                        let (a, _, _) = get_min_distance_to_path(structure_center, &all_paths, IVec2::new(structure.model_size[0] / 2, structure.model_size[2] / 2) + IVec2::ONE * 10);
 
                         if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
                             continue;
@@ -201,14 +201,22 @@ fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE
     min
 }
 
-fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Vec<PathLine>>>) -> (f32, IVec2, Vec2) {
+fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Path>>, margin: IVec2) -> (f32, IVec2, Vec2) {
     let mut min: Option<f32> = None;
     let mut closest_point_total = IVec2::ZERO;
     let mut path_direction = Vec2::ZERO;
 
     for paths in paths_list {
         for path in *paths {
-            for line in path {
+            if !path.is_in_box(pos, margin) {
+                continue;
+            }
+
+            for line in &path.lines {
+                if !line.is_in_box(pos, margin) {
+                    continue;
+                }
+                
                 let (distance, closest_point, direction) = get_min_distance_to_line(line.start.as_vec2().to_array(), line.end.as_vec2().to_array(), pos.as_vec2().to_array());
                 match min {
                     None => {
