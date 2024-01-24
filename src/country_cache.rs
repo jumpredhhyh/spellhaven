@@ -226,8 +226,8 @@ impl PathCache {
 
                 if dir != direction {
                     path.push(PathLine {
-                        start: path.last().map(|x| x.end).unwrap_or(current * path_finding_lod.multiplier_i32()),
-                        end: prev * path_finding_lod.multiplier_i32(),
+                        start: path.last().map(|x| x.end).unwrap_or(prev * path_finding_lod.multiplier_i32()),
+                        end: current * path_finding_lod.multiplier_i32(),
                     });
                 }
 
@@ -235,6 +235,11 @@ impl PathCache {
 
                 current = prev;
             }
+            path.push(PathLine {
+                start: path.last().map(|x| x.end).unwrap(),
+                end: current * path_finding_lod.multiplier_i32(),
+            });
+
             path
         } else {
             info!("NO PATH COULD BE CREATED!");
