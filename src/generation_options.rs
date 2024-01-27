@@ -93,6 +93,26 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
     pub fn get_cache_entry(&self, key: K, generation_options: Arc<GenerationOptions>) -> Arc<T> {
         self.get_generated_cache_entry(self.get_hash_lock_entry(key), key, generation_options)
     }
+    
+    pub fn try_get_entry_no_lock(&self, key: K) -> Option<Arc<T>> {
+        match self.cache_lock.try_read() {
+            Ok(read) => {
+                let entry = read.get(&key)?;
+                match entry.try_read() {
+                    Ok(read) => {
+                        match read.deref() {
+                            None => { None }
+                            Some(t) => {
+                                Some(t.clone())
+                            }
+                        }
+                    }
+                    Err(_) => { None }
+                }
+            }
+            Err(_) => { None }
+        }
+    }
 
     fn get_hash_lock_entry(&self, key: K) -> Arc<RwLock<Option<Arc<T>>>> {
         let read = self.cache_lock.read().unwrap();
