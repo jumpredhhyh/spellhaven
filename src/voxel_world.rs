@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
-use crate::country_cache::COUNTRY_SIZE;
+use crate::country_cache::CountryCache;
 use crate::generation_options::{GenerationOptions};
 use crate::mesh_generation::generate_mesh;
 use crate::quad_tree_data::QuadTreeNode;
@@ -73,7 +73,7 @@ impl Default for QuadTreeVoxelWorld {
 }
 
 pub trait VoxelWorld {
-    fn generate_chunk(chunk_position: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult;
+    fn generate_chunk(chunk_position: IVec2, chunk_lod: ChunkLod, lod_position: IVec2, generation_options: Arc<GenerationOptions>, chunk_height: i32, country_cache: &CountryCache) -> ChunkGenerationResult;
     fn has_chunk(&self, chunk_position: [i32; 2]) -> bool;
     fn add_chunk(&mut self, chunk_position: [i32; 2], chunk: Option<QuadTreeNode<HashMap<i32, Entity>>>) -> bool;
     fn remove_chunk(&mut self, chunk_position: [i32; 2]) -> bool;
@@ -85,18 +85,15 @@ impl Resource for QuadTreeVoxelWorld {}
 pub struct ChunkGenerationResult {
     pub task_data: Option<ChunkTaskData>,
     pub generate_above: bool,
-    pub parent_pos: [i32; 2],
+    pub parent_pos: IVec2,
     pub lod: ChunkLod,
-    pub lod_position: [i32; 2],
+    pub lod_position: IVec2,
     pub chunk_height: i32
 }
 
 impl VoxelWorld for QuadTreeVoxelWorld {
-    fn generate_chunk(parent_pos: [i32; 2], chunk_lod: ChunkLod, lod_position: [i32; 2], generation_options: Arc<GenerationOptions>, chunk_height: i32) -> ChunkGenerationResult {
-        let country_pos = IVec2::new(parent_pos[0].div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32)), parent_pos[1].div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32)));
-        let country_cache = generation_options.country_cache.get_cache_entry(country_pos, generation_options.clone());
-
-        let new_chunk_pos = [parent_pos[0] * MAX_LOD.multiplier_i32() + lod_position[0] * chunk_lod.multiplier_i32(), chunk_height, parent_pos[1] * MAX_LOD.multiplier_i32() + lod_position[1] * chunk_lod.multiplier_i32()];
+    fn generate_chunk(parent_pos: IVec2, chunk_lod: ChunkLod, lod_position: IVec2, generation_options: Arc<GenerationOptions>, chunk_height: i32, country_cache: &CountryCache) -> ChunkGenerationResult {
+        let new_chunk_pos = [parent_pos.x * MAX_LOD.multiplier_i32() + lod_position.x * chunk_lod.multiplier_i32(), chunk_height, parent_pos.y * MAX_LOD.multiplier_i32() + lod_position.y * chunk_lod.multiplier_i32()];
         let mesh = generate_mesh(generate_voxels(new_chunk_pos, &generation_options, chunk_lod, &country_cache), chunk_lod);
 
         return ChunkGenerationResult{

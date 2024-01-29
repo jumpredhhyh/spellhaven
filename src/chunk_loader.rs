@@ -79,7 +79,7 @@ fn unload_chunks(
             let mut chunk_owner = commands.entity(entity);
             chunk_owner.remove::<ChunkParent>().insert(DespawnAnimation::default());
             for child in &children {
-                if child.1.2 == entity {
+                if child.1.1 == entity {
                     info!("Cancelled Child!");
                     commands.entity(child.0).remove::<ChunkGenerationTask>();
                 }

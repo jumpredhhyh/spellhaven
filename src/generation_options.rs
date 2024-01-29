@@ -12,7 +12,7 @@ use crate::country_cache::{CountryCache, PathCache, StructureCache};
 use crate::voxel_generation::StructureGenerator;
 
 #[derive(Resource)]
-pub struct GenerationOptionsResource(pub Arc<GenerationOptions>);
+pub struct GenerationOptionsResource(pub Arc<GenerationOptions>, pub HashMap<IVec2, GenerationState<CountryCache>>);
 
 impl Default for GenerationOptionsResource {
     fn default() -> Self {
@@ -22,7 +22,6 @@ impl Default for GenerationOptionsResource {
 
         Self {
             0: Arc::new(GenerationOptions {
-                country_cache: GenerationCache::new(),
                 path_cache: GenerationCache::new(),
                 structure_cache: GenerationCache::new(),
                 structures: vec![
@@ -56,6 +55,7 @@ impl Default for GenerationOptionsResource {
                 ],
                 structure_assets: vec![StructureAsset((*box_structure.0).clone())],
             }),
+            1: HashMap::new(),
         }
     }
 }
@@ -67,10 +67,14 @@ fn get_seeded_white_noise(seed: u64) -> FastNoise {
     noise
 }
 
+pub enum GenerationState<T> {
+    Generating,
+    Some(T)
+}
+
 pub struct GenerationOptions {
     pub structures: Vec<StructureGenerator>,
     pub structure_assets: Vec<StructureAsset>,
-    pub country_cache: GenerationCache<IVec2, CountryCache>,
     pub path_cache: GenerationCache<IVec2, PathCache>,
     pub structure_cache: GenerationCache<IVec2, StructureCache>,
 }
