@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
 use crate::chunk_generation::{VOXEL_SIZE};
@@ -69,10 +70,14 @@ fn setup(
     commands.spawn((
         Camera3dBundle {
             transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+            projection: Projection::Perspective(PerspectiveProjection {
+                far: 2f32.powi(20),
+                ..default()
+            }),
             ..default()
         },
         PanOrbitCamera::default(),
-        //AtmosphereCamera::default(),
+        AtmosphereCamera::default(),
         PlayerCamera,
         Name::new("PlayerCamera")
     ));
