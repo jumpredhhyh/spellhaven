@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
 use bevy::log::info;
-use bevy::math::IVec2;
+use bevy::math::{IVec2, Vec2};
 use noise::NoiseFn;
 use rand::Rng;
 use crate::chunk_generation::BlockType;
@@ -43,23 +43,40 @@ impl Path {
     }
 }
 
+#[derive(Clone)]
 pub struct PathLine {
     pub start: IVec2,
     pub end: IVec2,
+    pub spline_one: Vec2,
+    pub spline_two: Vec2,
     pub box_pos_start: IVec2,
     pub box_pos_end: IVec2,
+    pub estimated_length: f32,
 }
 
 impl PathLine {
-    fn new(start: IVec2, end: IVec2) -> Self {
-        let box_pos_start = IVec2::new(start.x.min(end.x), start.y.min(end.y));
-        let box_pos_end = IVec2::new(start.x.max(end.x), start.y.max(end.y));
+    fn new(start: IVec2, end: IVec2, before: IVec2, after: IVec2) -> Self {
+        let spline_one = start.as_vec2() + (end - before).as_vec2() / 2. / 3.;
+        let spline_two = end.as_vec2() - (after - start).as_vec2() / 2. / 3.;
+
+        let a = (spline_one - start.as_vec2()) / (end.as_vec2() - start.as_vec2());
+        let b = (spline_two - start.as_vec2()) / (end.as_vec2() - start.as_vec2());
+        let c = ((b - a) * 0.5 + a) * (end.as_vec2() - start.as_vec2());
+
+        let spline_one = spline_one.min(c + start.as_vec2());
+        let spline_two = spline_two.min(c + start.as_vec2());
+
+        let box_pos_start = start.min(end).min(spline_one.as_ivec2()).min(spline_two.as_ivec2()) - IVec2::ONE * 10;
+        let box_pos_end = start.max(end).max(spline_one.as_ivec2()).max(spline_two.as_ivec2()) + IVec2::ONE * 10;
 
         Self {
             start,
             end,
+            spline_one,
+            spline_two,
             box_pos_start,
             box_pos_end,
+            estimated_length: start.as_vec2().distance(end.as_vec2())
         }
     }
 
@@ -67,6 +84,44 @@ impl PathLine {
         let bb_start = self.box_pos_start - margin;
         let bb_end = self.box_pos_end + margin;
         !(point.x < bb_start.x || point.x > bb_end.x || point.y < bb_start.y || point.y > bb_end.y)
+    }
+
+    pub fn closest_point_on_line(&self, point: IVec2) -> (Vec2, f32) {
+        self.get_closest_point_on_spline_recursive(point, 0.5, 0)
+    }
+
+    fn get_closest_point_on_spline_recursive(&self, point: IVec2, current_t: f32, depth: i32) -> (Vec2, f32) {
+        if depth == (self.estimated_length / 2.) as i32 {
+            return (self.lerp_on_spline(current_t), current_t);
+        }
+
+        let new_t_difference = 1. / 2f32.powi(depth + 2);
+
+        let at = current_t - new_t_difference;
+        let a = point.as_vec2().distance_squared(self.lerp_on_spline(at));
+        let bt = current_t + new_t_difference;
+        let b = point.as_vec2().distance_squared(self.lerp_on_spline(bt));
+
+        if a < b {
+            self.get_closest_point_on_spline_recursive(point, at, depth + 1)
+        } else {
+            self.get_closest_point_on_spline_recursive(point, bt, depth + 1)
+        }
+    }
+
+    pub fn lerp_on_spline(&self, t: f32) -> Vec2 {
+        let a = Self::lerp(self.start.as_vec2(), self.spline_one, t);
+        let b = Self::lerp(self.spline_one, self.spline_two, t);
+        let c = Self::lerp(self.spline_two, self.end.as_vec2(), t);
+
+        let d = Self::lerp(a, b, t);
+        let e = Self::lerp(b, c, t);
+
+        Self::lerp(d, e, t)
+    }
+
+    fn lerp(p1: Vec2, p2: Vec2, t: f32) -> Vec2 {
+        (1. - t) * p1 + t * p2
     }
 }
 
@@ -129,7 +184,7 @@ impl GenerationCacheItem<IVec2> for PathCache {
         let top_structure_cache = generation_options.structure_cache.get_cache_entry(top_country_pos, generation_options.clone());
         let right_structure_cache = generation_options.structure_cache.get_cache_entry(right_country_pos, generation_options.clone());
 
-        let path_finding_lod = ChunkLod::OneTwentyEight;
+        let path_finding_lod = ChunkLod::Sixtyfourth;
 
         Self {
             paths: vec![
@@ -262,6 +317,12 @@ impl PathCache {
             let mut current = end_pos;
             let mut path: Vec<PathLine> = vec![];
 
+            let mut points: Vec<IVec2> = vec![];
+
+            if let Some(parent) = previous.get(&current) {
+                points.push((current - (*parent - current)) * path_finding_lod.multiplier_i32());
+            }
+
             let mut direction = IVec2::new(0, 0);
 
             while current != start_pos {
@@ -273,28 +334,28 @@ impl PathCache {
                 let dir = prev - current;
 
                 if dir != direction {
-                    let start = path.last().map(|x| x.end).unwrap_or(prev * path_finding_lod.multiplier_i32());
-                    let end = current * path_finding_lod.multiplier_i32();
-                    path.push(PathLine::new(
-                        start,
-                        end
-                    ));
+                    let next = current * path_finding_lod.multiplier_i32();
+                    points.push(next);
 
-                    check_min_max(start);
-                    check_min_max(end);
+                    check_min_max(next);
+
+                    direction = dir;
                 }
-
-                direction = dir;
 
                 current = prev;
             }
-            let last = current * path_finding_lod.multiplier_i32();
-            path.push(PathLine::new(
-                path.last().map(|x| x.end).unwrap(),
-                last
-            ));
 
+            let last = current * path_finding_lod.multiplier_i32();
+            points.push(last);
             check_min_max(last);
+
+            if points.len() >= 4 {
+                points.push(last - (points[points.len() - 2] - last));
+
+                for i in 1..points.len() - 2 {
+                    path.push(PathLine::new(points[i], points[i + 1], points[i - 1], points[i + 2]));
+                }
+            }
 
             Path {
                 lines: path,
