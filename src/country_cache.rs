@@ -43,7 +43,6 @@ impl Path {
     }
 }
 
-#[derive(Clone)]
 pub struct PathLine {
     pub start: IVec2,
     pub end: IVec2,
@@ -52,6 +51,7 @@ pub struct PathLine {
     pub box_pos_start: IVec2,
     pub box_pos_end: IVec2,
     pub estimated_length: f32,
+    pub sample_points: Vec<IVec2>,
 }
 
 impl PathLine {
@@ -66,18 +66,43 @@ impl PathLine {
         let spline_one = spline_one.min(c + start.as_vec2());
         let spline_two = spline_two.min(c + start.as_vec2());
 
-        let box_pos_start = start.min(end).min(spline_one.as_ivec2()).min(spline_two.as_ivec2()) - IVec2::ONE * 10;
-        let box_pos_end = start.max(end).max(spline_one.as_ivec2()).max(spline_two.as_ivec2()) + IVec2::ONE * 10;
+        let box_pos_start = start.min(end);
+        let box_pos_end = start.max(end);
 
-        Self {
+        let estimated_length = start.as_vec2().distance(end.as_vec2());
+
+        let mut path_line = Self {
             start,
             end,
             spline_one,
             spline_two,
             box_pos_start,
             box_pos_end,
-            estimated_length: start.as_vec2().distance(end.as_vec2())
+            estimated_length,
+            sample_points: vec![start],
+        };
+
+        let num_points = (estimated_length / 10.).max(2.);
+
+        let mut last_point = IVec2::ZERO;
+
+        for i in 1..num_points as i32 {
+            let current_progress = i as f32 / num_points;
+
+            let current_pos = path_line.lerp_on_spline(current_progress).as_ivec2();
+
+            if last_point != current_pos {
+                path_line.sample_points.push(current_pos);
+                path_line.box_pos_start = path_line.box_pos_start.min(current_pos);
+                path_line.box_pos_end = path_line.box_pos_end.max(current_pos);
+
+                last_point = current_pos;
+            }
         }
+
+        path_line.sample_points.push(end);
+
+        path_line
     }
 
     pub fn is_in_box(&self, point: IVec2, margin: IVec2) -> bool {
@@ -86,27 +111,49 @@ impl PathLine {
         !(point.x < bb_start.x || point.x > bb_end.x || point.y < bb_start.y || point.y > bb_end.y)
     }
 
-    pub fn closest_point_on_line(&self, point: IVec2) -> (Vec2, f32) {
-        self.get_closest_point_on_spline_recursive(point, 0.5, 0)
+    pub fn closest_point_on_line(&self, point: IVec2, margin: IVec2) -> Option<(Vec2, Vec2)> {
+        let mut min_squared = i32::MAX;
+        let mut closest = Vec2::ZERO;
+        let mut closest_index = 0usize;
+
+        for i in 1..self.sample_points.len() {
+            let end = self.sample_points[i];
+            let start = self.sample_points[i - 1];
+
+            let box_start = start.min(end);
+            let box_end = start.max(end);
+
+            if point.cmpge(box_start - margin).all() && point.cmplt(box_end + margin).all() {
+                let closest_point = Self::get_closest_point_to_line(start, end, point);
+                let dist_squared = point.distance_squared(closest_point.as_ivec2());
+                if dist_squared < min_squared {
+                    min_squared = dist_squared;
+                    closest = closest_point;
+                    closest_index = i;
+                }
+            }
+        }
+
+        if min_squared < i32::MAX {
+            let closest_start = self.sample_points[closest_index - 1];
+            let closest_end = self.sample_points[closest_index];
+
+            Some((closest, (closest_end - closest_start).as_vec2().normalize()))
+        } else {
+            None
+        }
     }
 
-    fn get_closest_point_on_spline_recursive(&self, point: IVec2, current_t: f32, depth: i32) -> (Vec2, f32) {
-        if depth == (self.estimated_length / 2.) as i32 {
-            return (self.lerp_on_spline(current_t), current_t);
+    fn get_closest_point_to_line(line_start: IVec2, line_end: IVec2, point: IVec2) -> Vec2 {
+        let length_squared = (line_end - line_start).length_squared();
+        if length_squared == 0 {
+            return line_start.as_vec2();
         }
 
-        let new_t_difference = 1. / 2f32.powi(depth + 2);
+        let t = ((point - line_start).dot(line_end - line_start) as f32 / length_squared as f32).clamp(0., 1.);
+        let projection = line_start.as_vec2() + t * (line_end - line_start).as_vec2();
 
-        let at = current_t - new_t_difference;
-        let a = point.as_vec2().distance_squared(self.lerp_on_spline(at));
-        let bt = current_t + new_t_difference;
-        let b = point.as_vec2().distance_squared(self.lerp_on_spline(bt));
-
-        if a < b {
-            self.get_closest_point_on_spline_recursive(point, at, depth + 1)
-        } else {
-            self.get_closest_point_on_spline_recursive(point, bt, depth + 1)
-        }
+        projection
     }
 
     pub fn lerp_on_spline(&self, t: f32) -> Vec2 {

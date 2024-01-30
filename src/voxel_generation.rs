@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use bevy::math::IVec2;
+use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
 use noise::{Add, Constant, Fbm, MultiFractal, Multiply, NoiseFn, Perlin, Seedable, Turbulence, Worley};
 use noise::core::worley::distance_functions::euclidean;
@@ -59,17 +60,16 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
             let mut noise_height = terrain_height[x][z];
 
-            let (mut path_distance, _, path_t, line) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths, IVec2::ONE * 15);
+            let (mut path_distance, closest_point_on_path, path_dir, _) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths, IVec2::ONE * 15);
             let is_path = path_distance <= 8.75;
 
             path_distance /= 10.;
 
             if path_distance <= 1.65 {
-                //let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32 - 1.5;
+                let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32;
+                //let path_height = path_height + (terrain_noise.get((closest_point_on_path + (path_dir * 16.).as_ivec2()).to_array()) * 0.5 + terrain_noise.get((closest_point_on_path - (path_dir * 16.).as_ivec2()).to_array()) * 0.5) as f32 * 0.5;
 
-                let path_height = (terrain_noise.get(line.clone().unwrap().lerp_on_spline(path_t - 10. / line.clone().unwrap().estimated_length).as_ivec2().to_array()) * 0.5 + terrain_noise.get(line.clone().unwrap().lerp_on_spline(path_t + 10. / line.unwrap().estimated_length).as_ivec2().to_array()) * 0.5) as f32;
-
-                noise_height = lerp(noise_height, path_height, (1.65 - path_distance.powi(2)).clamp(0., 0.9)).max(noise_height - 10.);
+                noise_height = lerp(noise_height, path_height, (1.65 - path_distance.powi(2)).clamp(0., 1.)).max(noise_height - 10.);
             }
 
             let _country_value = country_noise.get([total_x as f64, total_z as f64]);
@@ -200,10 +200,10 @@ fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE
     min
 }
 
-fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Path>>, margin: IVec2) -> (f32, IVec2, f32, Option<PathLine>) {
+fn get_min_distance_to_path<'a>(pos: IVec2, paths_list: &'a Vec<&'a Vec<Path>>, margin: IVec2) -> (f32, IVec2, Vec2, Option<&'a PathLine>) {
     let mut min: Option<f32> = None;
     let mut closest_point_total = IVec2::ZERO;
-    let mut path_t = 0.;
+    let mut path_dir = Vec2::ZERO;
     let mut end_path = None;
 
     for paths in paths_list {
@@ -217,22 +217,23 @@ fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Path>>, margin: IV
                     continue;
                 }
 
-                let (closest_point, lerp_t) = line.closest_point_on_line(pos);
-                let closest_point = closest_point.as_ivec2();
-                let distance = closest_point.as_vec2().distance(pos.as_vec2());
-                match min {
-                    None => {
-                        min = Some(distance);
-                        closest_point_total = closest_point;
-                        path_t = lerp_t;
-                        end_path = Some(line.clone());
-                    }
-                    Some(current_min) => {
-                        if distance < current_min {
+                if let Some((closest_point, closest_path_dir)) = line.closest_point_on_line(pos, margin) {
+                    let closest_point = closest_point;
+                    let distance = closest_point.distance(pos.as_vec2());
+                    match min {
+                        None => {
                             min = Some(distance);
-                            closest_point_total = closest_point;
-                            path_t = lerp_t;
-                            end_path = Some(line.clone());
+                            closest_point_total = closest_point.as_ivec2();
+                            path_dir = closest_path_dir;
+                            end_path = Some(line);
+                        }
+                        Some(current_min) => {
+                            if distance < current_min {
+                                min = Some(distance);
+                                closest_point_total = closest_point.as_ivec2();
+                                path_dir = closest_path_dir;
+                                end_path = Some(line);
+                            }
                         }
                     }
                 }
@@ -240,7 +241,7 @@ fn get_min_distance_to_path(pos: IVec2, paths_list: &Vec<&Vec<Path>>, margin: IV
         }
     }
 
-    (min.unwrap_or(f32::INFINITY), closest_point_total, path_t, end_path)
+    (min.unwrap_or(f32::INFINITY), closest_point_total, path_dir, end_path)
 }
 
 fn lerp(a: f32, b: f32, f: f32) -> f32 {

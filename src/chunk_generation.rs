@@ -3,11 +3,13 @@ use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
+use noise::NoiseFn;
 use crate::chunk_loader::{ChunkLoader, ChunkLoaderPlugin, get_chunk_position};
 use crate::country_cache::{COUNTRY_SIZE, CountryCache};
 use crate::generation_options::{GenerationCacheItem, GenerationOptionsResource, GenerationState};
 use crate::quad_tree_data::QuadTreeNode;
 use crate::quad_tree_data::QuadTreeNode::{Data, Node};
+use crate::voxel_generation::get_terrain_noise;
 use crate::voxel_world::{ChunkGenerationResult, ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
@@ -60,7 +62,7 @@ impl Plugin for ChunkGenerationPlugin {
         app
             .add_plugins(ChunkLoaderPlugin)
             //.add_systems(Startup, setup)
-            .add_systems(Update, (set_generated_chunks, start_chunk_tasks, set_generated_caches))
+            .add_systems(Update, (set_generated_chunks, start_chunk_tasks, set_generated_caches, draw_path_gizmos))
             .add_systems(Update, start_generating_quadtree_chunks.after(upgrade_quad_trees))
             .add_systems(Update, upgrade_quad_trees.after(set_generated_chunks))
             .insert_resource(QuadTreeVoxelWorld::default())
@@ -389,6 +391,26 @@ fn set_generated_caches(
         if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
             generation_options.1.insert(chunk_task_data_option.country_pos, GenerationState::Some(chunk_task_data_option));
             commands.entity(entity).despawn();
+        }
+    }
+}
+
+fn draw_path_gizmos(
+    mut gizmos: Gizmos,
+    generation_options: Res<GenerationOptionsResource>,
+) {
+    let terrain_noise = get_terrain_noise(ChunkLod::Full);
+
+    for (_, country_cache) in generation_options.1.iter() {
+        match country_cache {
+            GenerationState::Some(country_cache) => {
+                for path in &country_cache.this_path_cache.paths {
+                    for path_line in &path.lines {
+                        gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, Color::GREEN);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
