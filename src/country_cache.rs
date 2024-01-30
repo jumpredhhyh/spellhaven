@@ -63,13 +63,13 @@ impl PathLine {
         let b = (spline_two - start.as_vec2()) / (end.as_vec2() - start.as_vec2());
         let c = ((b - a) * 0.5 + a) * (end.as_vec2() - start.as_vec2());
 
-        let spline_one = spline_one.min(c + start.as_vec2());
-        let spline_two = spline_two.min(c + start.as_vec2());
+        let estimated_length = start.as_vec2().distance(end.as_vec2());
+
+        let spline_one = start.as_vec2() + (spline_one - start.as_vec2()).normalize() * (estimated_length / 2.);
+        let spline_two = end.as_vec2() + (spline_two - end.as_vec2()).normalize() * (estimated_length / 2.);
 
         let box_pos_start = start.min(end);
         let box_pos_end = start.max(end);
-
-        let estimated_length = start.as_vec2().distance(end.as_vec2());
 
         let mut path_line = Self {
             start,

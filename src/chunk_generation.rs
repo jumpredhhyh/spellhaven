@@ -430,6 +430,11 @@ fn draw_path_gizmos(
                                             gizmos.circle(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::GREEN);
                                             gizmos.circle(Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::RED);
 
+                                            for i in 1..path_line.sample_points.len() {
+                                                let start = path_line.sample_points[i - 1];
+                                                let end = path_line.sample_points[i];
+                                                gizmos.line(Vec3::from((start.as_vec2(), terrain_noise.get(start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((end.as_vec2(), terrain_noise.get(end.to_array()) as f32)).xzy() * VOXEL_SIZE, Color::RED);
+                                            }
                                         }
                                     }
                                 }
