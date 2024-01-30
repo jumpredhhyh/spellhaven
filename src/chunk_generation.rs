@@ -7,6 +7,7 @@ use noise::NoiseFn;
 use crate::chunk_loader::{ChunkLoader, ChunkLoaderPlugin, get_chunk_position};
 use crate::country_cache::{COUNTRY_SIZE, CountryCache};
 use crate::generation_options::{GenerationCacheItem, GenerationOptionsResource, GenerationState};
+use crate::player::Player;
 use crate::quad_tree_data::QuadTreeNode;
 use crate::quad_tree_data::QuadTreeNode::{Data, Node};
 use crate::voxel_generation::get_terrain_noise;
@@ -65,6 +66,7 @@ impl Plugin for ChunkGenerationPlugin {
             .add_systems(Update, (set_generated_chunks, start_chunk_tasks, set_generated_caches, draw_path_gizmos))
             .add_systems(Update, start_generating_quadtree_chunks.after(upgrade_quad_trees))
             .add_systems(Update, upgrade_quad_trees.after(set_generated_chunks))
+            .add_systems(Startup, setup_gizmo_settings)
             .insert_resource(QuadTreeVoxelWorld::default())
             .insert_resource(ChunkTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(6_000_000).build()))
             .insert_resource(CacheTaskPool(TaskPoolBuilder::new().num_threads(2).stack_size(6_000_000).build()))
@@ -395,22 +397,48 @@ fn set_generated_caches(
     }
 }
 
+fn setup_gizmo_settings(mut config: ResMut<GizmoConfig>) {
+    config.depth_bias = -1.;
+    config.line_width = 4.;
+}
+
 fn draw_path_gizmos(
     mut gizmos: Gizmos,
     generation_options: Res<GenerationOptionsResource>,
+    players: Query<&Transform, With<Player>>,
 ) {
     let terrain_noise = get_terrain_noise(ChunkLod::Full);
 
-    for (_, country_cache) in generation_options.1.iter() {
-        match country_cache {
-            GenerationState::Some(country_cache) => {
-                for path in &country_cache.this_path_cache.paths {
-                    for path_line in &path.lines {
-                        gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, Color::GREEN);
+    for player in &players {
+        let player_country_pos = (player.translation * VOXEL_SIZE / COUNTRY_SIZE as f32).floor().as_ivec3();
+        let player_voxel_pos = (player.translation / VOXEL_SIZE).as_ivec3().xz();
+        match generation_options.1.get(&player_country_pos.xz()) {
+            None => {}
+            Some(country_cache) => {
+                match country_cache {
+                    GenerationState::Some(country_cache) => {
+                        for path in country_cache.this_path_cache.paths.iter().chain(&country_cache.bottom_path_cache.paths).chain(&country_cache.left_path_cache.paths) {
+                            if path.is_in_box(player_voxel_pos, IVec2::ONE * 500) {
+                                for path_line in &path.lines {
+                                    if path_line.is_in_box(player_voxel_pos, IVec2::ONE * 500) {
+                                        let is_in_path = path_line.is_in_box(player_voxel_pos, IVec2::ZERO);
+                                        let color = if is_in_path { Color::ORANGE } else { Color::GREEN };
+                                        gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, color);
+                                        if is_in_path {
+                                            gizmos.circle(Vec3::from((path_line.spline_one, terrain_noise.get(path_line.spline_one.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::GREEN);
+                                            gizmos.circle(Vec3::from((path_line.spline_two, terrain_noise.get(path_line.spline_two.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::RED);
+                                            gizmos.circle(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::GREEN);
+                                            gizmos.circle(Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::Y, 1., Color::RED);
+
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
+                    _ => {}
                 }
             }
-            _ => {}
         }
     }
 }
