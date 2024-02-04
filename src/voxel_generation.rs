@@ -56,18 +56,24 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             let total_x = position[0] * CHUNK_SIZE[0] as i32 + x as i32 * chunk_lod.multiplier_i32();
             let total_z = position[2] * CHUNK_SIZE[2] as i32 + z as i32 * chunk_lod.multiplier_i32();
 
-            let _dryness = value_noise.get([total_x as f64, total_z as f64]);
+            let dryness = value_noise.get([total_x as f64, total_z as f64]);
 
             let mut noise_height = terrain_height[x][z];
 
-            let (mut path_distance, closest_point_on_path, path_dir, _) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths, IVec2::ONE * 15);
+            let (mut path_distance, closest_point_on_path, _, line) = get_min_distance_to_path(IVec2::new(total_x, total_z), &all_paths, IVec2::ONE * 15);
             let is_path = path_distance <= 8.75;
 
             path_distance /= 10.;
 
             if path_distance <= 1.65 {
-                let path_height = terrain_noise.get(closest_point_on_path.to_array()) as f32;
-                //let path_height = path_height + (terrain_noise.get((closest_point_on_path + (path_dir * 16.).as_ivec2()).to_array()) * 0.5 + terrain_noise.get((closest_point_on_path - (path_dir * 16.).as_ivec2()).to_array()) * 0.5) as f32 * 0.5;
+                let path_start_height = terrain_noise.get(line.unwrap().start.to_array()) as f32;
+                let path_end_height = terrain_noise.get(line.unwrap().end.to_array()) as f32;
+                let path_height = lerp(path_start_height, path_end_height, line.unwrap().get_progress_on_line(closest_point_on_path));
+
+                let closest_point_height = terrain_noise.get(closest_point_on_path.to_array()) as f32;
+                let closest_point_height = lerp(closest_point_height, noise_height, 0.5);
+
+                let path_height = lerp(closest_point_height, path_height, 0.5);
 
                 noise_height = lerp(noise_height, path_height, (1.65 - path_distance.powi(2)).clamp(0., 1.)).max(noise_height - 10.);
             }
@@ -76,7 +82,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
 
             for y in min_height as usize..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f32) as usize {
                 if y == CHUNK_SIZE[1] + 1 + min_height as usize { generate_more = true; }
-                blocks[x][y - min_height as usize][z] = if is_path { BlockType::Path } else { country_cache.grass_color }; // /*BlockType::Gray(((country_value + 1.) / 2. * 255.) as u8);*/ if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone }
+                blocks[x][y - min_height as usize][z] = if is_path { BlockType::Path } else { if y + 1 == noise_height.floor() as usize { if dryness < 0. { BlockType::Grass } else { BlockType::Sand } } else { BlockType::Stone } };
             }
 
             for structure in &generation_options.structures {
@@ -217,8 +223,7 @@ fn get_min_distance_to_path<'a>(pos: IVec2, paths_list: &'a Vec<&'a Vec<Path>>, 
                     continue;
                 }
 
-                if let Some((closest_point, closest_path_dir)) = line.closest_point_on_line(pos, margin) {
-                    let closest_point = closest_point;
+                if let Some((closest_point, closest_path_dir)) = line.closest_point_on_path(pos, margin) {
                     let distance = closest_point.distance(pos.as_vec2());
                     match min {
                         None => {

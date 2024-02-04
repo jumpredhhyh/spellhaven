@@ -8,6 +8,7 @@ use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use spellhaven::chunk_generation::ChunkGenerationPlugin;
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
+use spellhaven::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::fps_ui::FpsUi;
 use spellhaven::player::PlayerPlugin;
 
@@ -26,6 +27,7 @@ fn main() {
             //BirdCameraPlugin,
             WorldInspectorPlugin::new(),
             FpsUi,
+            SpellhavenDebugPlugin,
         ))
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {

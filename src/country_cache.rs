@@ -59,10 +59,6 @@ impl PathLine {
         let spline_one = start.as_vec2() + (end - before).as_vec2() / 2. / 3.;
         let spline_two = end.as_vec2() - (after - start).as_vec2() / 2. / 3.;
 
-        let a = (spline_one - start.as_vec2()) / (end.as_vec2() - start.as_vec2());
-        let b = (spline_two - start.as_vec2()) / (end.as_vec2() - start.as_vec2());
-        let c = ((b - a) * 0.5 + a) * (end.as_vec2() - start.as_vec2());
-
         let estimated_length = start.as_vec2().distance(end.as_vec2());
 
         let spline_one = start.as_vec2() + (spline_one - start.as_vec2()).normalize() * (estimated_length / 2.);
@@ -82,7 +78,7 @@ impl PathLine {
             sample_points: vec![start],
         };
 
-        let num_points = (estimated_length / 10.).max(2.);
+        let num_points = (estimated_length / 20.).max(2.);
 
         let mut last_point = IVec2::ZERO;
 
@@ -111,7 +107,14 @@ impl PathLine {
         !(point.x < bb_start.x || point.x > bb_end.x || point.y < bb_start.y || point.y > bb_end.y)
     }
 
-    pub fn closest_point_on_line(&self, point: IVec2, margin: IVec2) -> Option<(Vec2, Vec2)> {
+    pub fn get_progress_on_line(&self, point: IVec2) -> f32 {
+        let distance_to_start = self.start.distance_squared(point) as f32;
+        let distance_to_end = self.end.distance_squared(point) as f32;
+
+        distance_to_start / (distance_to_start + distance_to_end)
+    }
+
+    pub fn closest_point_on_path(&self, point: IVec2, margin: IVec2) -> Option<(Vec2, Vec2)> {
         let mut min_squared = i32::MAX;
         let mut closest = Vec2::ZERO;
         let mut closest_index = 0usize;
@@ -308,7 +311,6 @@ impl PathCache {
 
             for (next, weight) in neighbours(current) {
                 if is_outside_of_countries(next) {
-                    //info!("Outside of countries!");
                     continue;
                 }
 
@@ -318,16 +320,12 @@ impl PathCache {
 
                 let next_height = get_terrain_height(next);
 
-                let x_neighbour = get_terrain_height(next + if next.x == 0 { IVec2::X } else { IVec2::NEG_X });
-                let y_neighbour = get_terrain_height(next + if next.y == 0 { IVec2::Y } else { IVec2::NEG_Y });
-                let total_steepness = (next_height - x_neighbour).abs().max((next_height - y_neighbour).abs()) / path_finding_lod.multiplier_i32() as f64;
-
                 let height_difference = (current_height - next_height).abs() / path_finding_lod.multiplier_i32() as f64;
-                if height_difference > 0.6 || direction_cost > 1 || total_steepness > 2.5 {
+                if height_difference > 0.55 || direction_cost > 1 {
                     continue;
                 }
 
-                let real_weight = real_weight + weight + ((total_steepness * 0.5).max(0.) * 10.0) as i32;
+                let real_weight = real_weight + weight + (height_difference * 20.) as i32;//((total_steepness * 0.6).max(0.) * 10.0) as i32;
                 if weights
                     .get(&next)
                     .map(|&weight| real_weight < weight)
@@ -370,7 +368,7 @@ impl PathCache {
                 points.push((current - (*parent - current)) * path_finding_lod.multiplier_i32());
             }
 
-            let mut direction = IVec2::new(0, 0);
+
 
             while current != start_pos {
                 let prev = previous
@@ -380,21 +378,35 @@ impl PathCache {
 
                 let dir = prev - current;
 
-                if dir != direction {
-                    let next = current * path_finding_lod.multiplier_i32();
-                    points.push(next);
+                let next = current * path_finding_lod.multiplier_i32() + (dir * path_finding_lod.multiplier_i32()) / 2;
 
-                    check_min_max(next);
+                points.push(next);
 
-                    direction = dir;
-                }
+                check_min_max(next);
 
                 current = prev;
             }
 
+            // let mut direction = IVec2::new(0, 0);
+
+            // let mut chopped_points = Vec::new();
+            //
+            // for i in 1..points.len() {
+            //     let dir = points[i] - points[i - 1];
+            //     if dir != direction {
+            //         chopped_points.push(points[i - 1]);
+            //
+            //         direction = dir;
+            //     }
+            // }
+            //
+            // chopped_points.push(*points.last().unwrap_or(&IVec2::default()));
+
+            //let points = chopped_points;
+
             let last = current * path_finding_lod.multiplier_i32();
-            points.push(last);
-            check_min_max(last);
+            //points.push(last);
+            //check_min_max(last);
 
             if points.len() >= 4 {
                 points.push(last - (points[points.len() - 2] - last));
