@@ -21,7 +21,7 @@ impl Default for GenerationOptionsResource {
         let tree_house = vox_data_to_structure_data(&from_file("assets/tree_house.vox").unwrap());
         let box_structure = vox_data_to_structure_data(&from_file("assets/box.vox").unwrap());
 
-        let seed = 0;
+        let seed = 3;
 
         let mut rng = StdRng::seed_from_u64(seed);
 

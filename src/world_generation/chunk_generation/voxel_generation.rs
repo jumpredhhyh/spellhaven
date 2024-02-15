@@ -127,7 +127,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let noise_height = terrain_noise.get([structure_noise_height_x, structure_noise_height_z]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
-                        if (index as i32 + noise_height as i32) % chunk_lod.multiplier_i32() != 0 {
+                        if (index as i32 + (noise_height * chunk_lod.multiplier_i32() as f64) as i32) % chunk_lod.multiplier_i32() != 0 {
                             continue;
                         }
                         let chunk_index = index.div_floor(chunk_lod.multiplier_i32() as usize);

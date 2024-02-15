@@ -4,7 +4,8 @@ use std::sync::Arc;
 use bevy::log::info;
 use bevy::math::{IVec2, Vec2};
 use noise::NoiseFn;
-use rand::Rng;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use crate::world_generation::chunk_generation::BlockType;
 use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
 use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptions};
@@ -210,8 +211,9 @@ impl GenerationCacheItem<IVec2> for CountryCache {
 }
 
 impl GenerationCacheItem<IVec2> for StructureCache {
-    fn generate(key: IVec2, _generation_options: &GenerationOptions) -> Self {
-        let mut rng = rand::thread_rng();
+    fn generate(key: IVec2, generation_options: &GenerationOptions) -> Self {
+        let mut rng = StdRng::seed_from_u64(if key.x < 0 {generation_options.seed.wrapping_sub(key.x.abs() as u64)} else {generation_options.seed.wrapping_add(key.x.abs() as u64)});
+        let mut rng = StdRng::seed_from_u64(if key.x < 0 {rng.gen::<u64>().wrapping_sub(key.y.abs() as u64)} else {rng.gen::<u64>().wrapping_add(key.y.abs() as u64)});
 
         let min_offset = 100i32;
 
