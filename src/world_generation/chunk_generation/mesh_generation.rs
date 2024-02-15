@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use rand::Rng;
-use crate::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
-use crate::voxel_world::ChunkLod;
+use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
+use crate::world_generation::voxel_world::ChunkLod;
 
 pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool), chunk_lod: ChunkLod) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);

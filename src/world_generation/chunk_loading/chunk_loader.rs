@@ -1,14 +1,14 @@
 use bevy::log::info;
 use bevy::prelude::{App, Commands, Component, Entity, IntoSystemConfigs, Plugin, Query, ResMut, Transform, Update, Vec3};
 use crate::animations::DespawnAnimation;
-use crate::chunk_generation::{CHUNK_SIZE, ChunkGenerationTask, ChunkGenerator, ChunkParent, VOXEL_SIZE};
-use crate::voxel_world::{ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
+use crate::world_generation::chunk_generation::{CHUNK_SIZE, ChunkGenerationTask, ChunkGenerator, ChunkParent, VOXEL_SIZE};
+use crate::world_generation::voxel_world::{ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
 
 pub struct ChunkLoaderPlugin;
 
 impl Plugin for ChunkLoaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (load_chunks, unload_chunks).after(crate::chunk_generation::upgrade_quad_trees));
+        app.add_systems(Update, (load_chunks, unload_chunks).after(crate::world_generation::chunk_generation::upgrade_quad_trees));
     }
 }
 

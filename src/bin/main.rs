@@ -5,12 +5,12 @@ use bevy_atmosphere::prelude::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
-use spellhaven::chunk_generation::ChunkGenerationPlugin;
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
-use spellhaven::debug_resource::SpellhavenDebugPlugin;
-use spellhaven::fps_ui::FpsUi;
+use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::player::PlayerPlugin;
+use spellhaven::ui::fps_ui::FpsUi;
+use spellhaven::world_generation::chunk_generation::ChunkGenerationPlugin;
 
 fn main() {
     App::new()

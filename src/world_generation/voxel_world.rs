@@ -2,12 +2,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
-use crate::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
-use crate::country_cache::CountryCache;
-use crate::generation_options::{GenerationOptions};
-use crate::mesh_generation::generate_mesh;
-use crate::quad_tree_data::QuadTreeNode;
-use crate::voxel_generation::generate_voxels;
+use crate::world_generation::chunk_generation::{CHUNK_SIZE, ChunkTaskData, VOXEL_SIZE};
+use crate::world_generation::chunk_generation::mesh_generation::generate_mesh;
+use crate::world_generation::chunk_generation::voxel_generation::generate_voxels;
+use crate::world_generation::chunk_loading::country_cache::CountryCache;
+use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
+use crate::world_generation::generation_options::GenerationOptions;
 
 pub const MAX_LOD: ChunkLod = ChunkLod::OneTwentyEight;
 

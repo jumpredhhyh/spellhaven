@@ -1,7 +1,7 @@
 use bevy::app::App;
 use bevy::prelude::{Camera3dBundle, Commands, Component, default, Name, Plugin, Query, Startup, Transform, TransformBundle, Update, Vec3, With};
 use bevy_panorbit_camera::PanOrbitCamera;
-use crate::chunk_loader::ChunkLoader;
+use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
 
 pub struct BirdCameraPlugin;
 

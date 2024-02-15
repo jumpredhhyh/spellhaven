@@ -7,12 +7,12 @@ use noise::core::worley::distance_functions::euclidean;
 use noise::core::worley::ReturnType;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
-use crate::chunk_generation::{BlockType, CHUNK_SIZE};
-use crate::country_cache::{COUNTRY_SIZE, CountryCache, Path, PathLine};
-use crate::fractal_open_simplex::FractalOpenSimplex;
-use crate::generation_options::GenerationOptions;
-use crate::roughness::Roughness;
-use crate::voxel_world::ChunkLod;
+use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE};
+use crate::world_generation::chunk_generation::noise::fractal_open_simplex::FractalOpenSimplex;
+use crate::world_generation::chunk_generation::noise::roughness::Roughness;
+use crate::world_generation::chunk_loading::country_cache::{COUNTRY_SIZE, CountryCache, Path, PathLine};
+use crate::world_generation::generation_options::GenerationOptions;
+use crate::world_generation::voxel_world::ChunkLod;
 
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
@@ -40,7 +40,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     .set_roughness(5)
     .set_seed(2);
 
-    let terrain_noise = get_terrain_noise(chunk_lod);
+    let terrain_noise = get_terrain_noise(chunk_lod, generation_options);
 
     let mut terrain_height = [[0f32; CHUNK_SIZE[0] + 2]; CHUNK_SIZE[0] + 2];
     get_noise_map(IVec2::new(position[0], position[2]) * IVec2::new(CHUNK_SIZE[0] as i32, CHUNK_SIZE[2] as i32), chunk_lod.multiplier_i32(), &terrain_noise, &mut terrain_height);
@@ -127,7 +127,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                     let noise_height = terrain_noise.get([structure_noise_height_x, structure_noise_height_z]);
 
                     for (index, sub_structure) in structure.model[structure_x as usize].iter().enumerate() {
-                        if index % chunk_lod.multiplier_i32() as usize != 0 {
+                        if (index as i32 + noise_height as i32) % chunk_lod.multiplier_i32() != 0 {
                             continue;
                         }
                         let chunk_index = index.div_floor(chunk_lod.multiplier_i32() as usize);
@@ -150,13 +150,15 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
     (blocks, min_height, generate_more)
 }
 
-pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Multiply<i32, Add<i32, Add<i32, FractalOpenSimplex<Roughness>, FractalOpenSimplex<Roughness>, 2>, Constant, 2>, Constant, 2>, Constant, 2> {
+pub fn get_terrain_noise(chunk_lod: ChunkLod, generation_options: &GenerationOptions) -> Add<i32, Multiply<i32, Add<i32, Add<i32, FractalOpenSimplex<Roughness>, FractalOpenSimplex<Roughness>, 2>, Constant, 2>, Constant, 2>, Constant, 2> {
+    let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
+
     Add::new(
         Multiply::new(
             Add::new(
                 Add::new(
                     FractalOpenSimplex::new(
-                        0,
+                        rng.gen(),
                         0.5f64.powi(9),
                         256.,
                         7,
@@ -165,7 +167,7 @@ pub fn get_terrain_noise(chunk_lod: ChunkLod) -> Add<i32, Multiply<i32, Add<i32,
                         Roughness::new(1, 0.5f64.powi(10), 0.2)
                     ),
                     FractalOpenSimplex::new(
-                        6,
+                        rng.gen(),
                         0.5f64.powi(14),
                         4096.,
                         7,

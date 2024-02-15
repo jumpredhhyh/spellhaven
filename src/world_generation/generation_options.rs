@@ -5,11 +5,12 @@ use std::sync::{Arc, RwLock};
 use bevy::prelude::{IVec2, Resource};
 use bracket_noise::prelude::FastNoise;
 use bracket_noise::prelude::NoiseType::WhiteNoise;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use vox_format::{from_file, VoxData};
-use crate::chunk_generation::BlockType;
-use crate::chunk_generation::BlockType::Custom;
-use crate::country_cache::{CountryCache, PathCache, StructureCache};
-use crate::voxel_generation::StructureGenerator;
+use crate::world_generation::chunk_generation::BlockType;
+use crate::world_generation::chunk_generation::voxel_generation::StructureGenerator;
+use crate::world_generation::chunk_loading::country_cache::{CountryCache, PathCache, StructureCache};
 
 #[derive(Resource)]
 pub struct GenerationOptionsResource(pub Arc<GenerationOptions>, pub HashMap<IVec2, GenerationState<CountryCache>>);
@@ -20,15 +21,20 @@ impl Default for GenerationOptionsResource {
         let tree_house = vox_data_to_structure_data(&from_file("assets/tree_house.vox").unwrap());
         let box_structure = vox_data_to_structure_data(&from_file("assets/box.vox").unwrap());
 
+        let seed = 0;
+
+        let mut rng = StdRng::seed_from_u64(seed);
+
         Self {
             0: Arc::new(GenerationOptions {
+                seed,
                 path_cache: GenerationCache::new(),
                 structure_cache: GenerationCache::new(),
                 structures: vec![
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: get_seeded_white_noise(1),
+                        noise: get_seeded_white_noise(rng.gen()),
                         generation_size: [30, 30],
                         grid_offset: [15, 15],
                         generate_debug_blocks: false,
@@ -37,7 +43,7 @@ impl Default for GenerationOptionsResource {
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: get_seeded_white_noise(2),
+                        noise: get_seeded_white_noise(rng.gen()),
                         generation_size: [30, 30],
                         grid_offset: [0, 0],
                         generate_debug_blocks: false,
@@ -46,7 +52,7 @@ impl Default for GenerationOptionsResource {
                     StructureGenerator {
                         model: tree_house.0.clone(),
                         model_size: tree_house.1,
-                        noise: get_seeded_white_noise(3),
+                        noise: get_seeded_white_noise(rng.gen()),
                         generation_size: [1000, 1000],
                         grid_offset: [7, 11],
                         generate_debug_blocks: false,
@@ -73,6 +79,7 @@ pub enum GenerationState<T> {
 }
 
 pub struct GenerationOptions {
+    pub seed: u64,
     pub structures: Vec<StructureGenerator>,
     pub structure_assets: Vec<StructureAsset>,
     pub path_cache: GenerationCache<IVec2, PathCache>,
@@ -80,7 +87,7 @@ pub struct GenerationOptions {
 }
 
 pub trait GenerationCacheItem<K: Copy + Eq + Hash> {
-    fn generate(key: K, generation_options: Arc<GenerationOptions>) -> Self;
+    fn generate(key: K, generation_options: &GenerationOptions) -> Self;
 }
 
 pub struct GenerationCache<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> {
@@ -94,7 +101,7 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
         }
     }
 
-    pub fn get_cache_entry(&self, key: K, generation_options: Arc<GenerationOptions>) -> Arc<T> {
+    pub fn get_cache_entry(&self, key: K, generation_options: &GenerationOptions) -> Arc<T> {
         self.get_generated_cache_entry(self.get_hash_lock_entry(key), key, generation_options)
     }
     
@@ -143,7 +150,7 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
         }
     }
 
-    fn get_generated_cache_entry(&self, hash_lock_entry: Arc<RwLock<Option<Arc<T>>>>, key: K, generation_options: Arc<GenerationOptions>) -> Arc<T> {
+    fn get_generated_cache_entry(&self, hash_lock_entry: Arc<RwLock<Option<Arc<T>>>>, key: K, generation_options: &GenerationOptions) -> Arc<T> {
         let read = hash_lock_entry.read().unwrap();
         match read.deref() {
             None => {
@@ -183,7 +190,7 @@ fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
 
     for voxel in model.voxels.iter() {
         let color = vox_data.palette.colors[voxel.color_index.0 as usize];
-        result[voxel.point.x as usize][voxel.point.z as usize][voxel.point.y as usize] = Custom(color.r, color.g, color.b);
+        result[voxel.point.x as usize][voxel.point.z as usize][voxel.point.y as usize] = BlockType::Custom(color.r, color.g, color.b);
     }
 
     result

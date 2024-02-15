@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
-use crate::chunk_generation::{VOXEL_SIZE};
-use crate::chunk_loader::ChunkLoader;
+use crate::world_generation::chunk_generation::VOXEL_SIZE;
+use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
 
 pub const STEP_HEIGHT: f32 = 1. * VOXEL_SIZE;
 

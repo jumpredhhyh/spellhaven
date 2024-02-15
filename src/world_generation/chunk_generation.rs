@@ -1,18 +1,22 @@
 use std::collections::HashMap;
+use ::noise::NoiseFn;
 use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
 use futures_lite::future;
-use noise::NoiseFn;
-use crate::chunk_loader::{ChunkLoader, ChunkLoaderPlugin, get_chunk_position};
-use crate::country_cache::{COUNTRY_SIZE, CountryCache};
-use crate::debug_resource::SpellhavenDebug;
-use crate::generation_options::{GenerationCacheItem, GenerationOptionsResource, GenerationState};
+use crate::debug_tools::debug_resource::SpellhavenDebug;
 use crate::player::Player;
-use crate::quad_tree_data::QuadTreeNode;
-use crate::quad_tree_data::QuadTreeNode::{Data, Node};
-use crate::voxel_generation::get_terrain_noise;
-use crate::voxel_world::{ChunkGenerationResult, ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
+use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
+use crate::world_generation::chunk_loading::chunk_loader::{ChunkLoader, ChunkLoaderPlugin, get_chunk_position};
+use crate::world_generation::chunk_loading::country_cache::{COUNTRY_SIZE, CountryCache};
+use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
+use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode::{Data, Node};
+use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptionsResource, GenerationState};
+use crate::world_generation::voxel_world::{ChunkGenerationResult, ChunkLod, MAX_LOD, QuadTreeVoxelWorld, VoxelWorld};
+
+pub mod mesh_generation;
+pub mod voxel_generation;
+mod noise;
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
 pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
@@ -109,7 +113,7 @@ fn start_chunk_tasks(
                 let arc_generation_options = generation_options.0.clone();
                 commands.spawn(CacheGenerationTask(
                     cache_task_pool.0.spawn(async move {
-                        CountryCache::generate(country_pos, arc_generation_options)
+                        CountryCache::generate(country_pos, &arc_generation_options)
                     })
                 ));
 
@@ -413,7 +417,7 @@ fn draw_path_gizmos(
         return;
     }
 
-    let terrain_noise = get_terrain_noise(ChunkLod::Full);
+    let terrain_noise = get_terrain_noise(ChunkLod::Full, &generation_options.0);
 
     for player in &players {
         let player_country_pos = (player.translation * VOXEL_SIZE / COUNTRY_SIZE as f32).floor().as_ivec3();

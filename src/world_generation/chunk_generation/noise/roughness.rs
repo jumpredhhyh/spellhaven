@@ -1,6 +1,6 @@
 use noise::permutationtable::PermutationTable;
 use noise::{NoiseFn, Seedable};
-use crate::fractal_open_simplex::noise;
+use crate::world_generation::chunk_generation::noise::fractal_open_simplex::noise;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Roughness {

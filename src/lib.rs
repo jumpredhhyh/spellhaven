@@ -3,18 +3,9 @@
 
 extern crate core;
 
-pub mod chunk_generation;
-pub mod mesh_generation;
-pub mod voxel_generation;
 pub mod player;
-pub mod voxel_world;
-pub mod chunk_loader;
 pub mod animations;
 pub mod bird_camera;
-pub mod generation_options;
-pub mod fractal_open_simplex;
-pub mod roughness;
-pub mod quad_tree_data;
-pub mod fps_ui;
-pub mod country_cache;
-pub mod debug_resource;
+pub mod world_generation;
+pub mod ui;
+pub mod debug_tools;

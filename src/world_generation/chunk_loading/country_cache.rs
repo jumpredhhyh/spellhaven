@@ -5,11 +5,10 @@ use bevy::log::info;
 use bevy::math::{IVec2, Vec2};
 use noise::NoiseFn;
 use rand::Rng;
-use crate::chunk_generation::BlockType;
-use crate::chunk_generation::BlockType::Custom;
-use crate::generation_options::{GenerationCacheItem, GenerationOptions};
-use crate::voxel_generation::get_terrain_noise;
-use crate::voxel_world::ChunkLod;
+use crate::world_generation::chunk_generation::BlockType;
+use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
+use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptions};
+use crate::world_generation::voxel_world::ChunkLod;
 
 #[derive(Clone)]
 pub struct CountryCache {
@@ -196,22 +195,22 @@ impl Ord for AStarCandidate {
 }
 
 impl GenerationCacheItem<IVec2> for CountryCache {
-    fn generate(key: IVec2, generation_options: Arc<GenerationOptions>) -> Self {
+    fn generate(key: IVec2, generation_options: &GenerationOptions) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             country_pos: key,
-            grass_color: Custom(rng.gen(), rng.gen(), rng.gen()),
-            structure_cache: generation_options.structure_cache.get_cache_entry(key, generation_options.clone()),
-            this_path_cache: generation_options.path_cache.get_cache_entry(key, generation_options.clone()),
-            bottom_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_X, generation_options.clone()),
-            left_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_Y, generation_options.clone()),
+            grass_color: BlockType::Custom(rng.gen(), rng.gen(), rng.gen()),
+            structure_cache: generation_options.structure_cache.get_cache_entry(key, generation_options),
+            this_path_cache: generation_options.path_cache.get_cache_entry(key, generation_options),
+            bottom_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_X, generation_options),
+            left_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_Y, generation_options),
         }
     }
 }
 
 impl GenerationCacheItem<IVec2> for StructureCache {
-    fn generate(key: IVec2, _generation_options: Arc<GenerationOptions>) -> Self {
+    fn generate(key: IVec2, _generation_options: &GenerationOptions) -> Self {
         let mut rng = rand::thread_rng();
 
         let min_offset = 100i32;
@@ -226,31 +225,31 @@ impl GenerationCacheItem<IVec2> for StructureCache {
 }
 
 impl GenerationCacheItem<IVec2> for PathCache {
-    fn generate(key: IVec2, generation_options: Arc<GenerationOptions>) -> Self {
+    fn generate(key: IVec2, generation_options: &GenerationOptions) -> Self {
         let top_country_pos = key + IVec2::X;
         let right_country_pos = key + IVec2::Y;
 
-        let current_structure_cache = generation_options.structure_cache.get_cache_entry(key, generation_options.clone());
-        let top_structure_cache = generation_options.structure_cache.get_cache_entry(top_country_pos, generation_options.clone());
-        let right_structure_cache = generation_options.structure_cache.get_cache_entry(right_country_pos, generation_options.clone());
+        let current_structure_cache = generation_options.structure_cache.get_cache_entry(key, generation_options);
+        let top_structure_cache = generation_options.structure_cache.get_cache_entry(top_country_pos, generation_options);
+        let right_structure_cache = generation_options.structure_cache.get_cache_entry(right_country_pos, generation_options);
 
         let path_finding_lod = ChunkLod::Sixtyfourth;
 
         Self {
             paths: vec![
-                PathCache::generate_path(current_structure_cache.city_location, top_structure_cache.city_location, [key, top_country_pos], path_finding_lod),
-                PathCache::generate_path(current_structure_cache.city_location, right_structure_cache.city_location, [key, right_country_pos], path_finding_lod),
+                PathCache::generate_path(current_structure_cache.city_location, top_structure_cache.city_location, [key, top_country_pos], path_finding_lod, generation_options),
+                PathCache::generate_path(current_structure_cache.city_location, right_structure_cache.city_location, [key, right_country_pos], path_finding_lod, generation_options),
             ],
         }
     }
 }
 
 impl PathCache {
-    fn generate_path(mut start_pos: IVec2, mut end_pos: IVec2, country_positions: [IVec2; 2], path_finding_lod: ChunkLod) -> Path {
+    fn generate_path(mut start_pos: IVec2, mut end_pos: IVec2, country_positions: [IVec2; 2], path_finding_lod: ChunkLod, generation_options: &GenerationOptions) -> Path {
         start_pos /= path_finding_lod.multiplier_i32();
         end_pos /= path_finding_lod.multiplier_i32();
 
-        let terrain_noise = get_terrain_noise(path_finding_lod);
+        let terrain_noise = get_terrain_noise(path_finding_lod, generation_options);
 
         let get_terrain_height = |pos: IVec2| -> f64 {
             terrain_noise.get((pos * path_finding_lod.multiplier_i32()).to_array()) * path_finding_lod.multiplier_i32() as f64
