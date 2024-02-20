@@ -46,7 +46,9 @@ impl<T> QuadTreeNode<T> {
 
             if *child_progress_lock == 4 {
                 for entity in entities {
-                    commands.entity(entity.clone()).despawn();
+                    if let Some(mut entity) = commands.get_entity(entity.clone()) {
+                        entity.despawn();
+                    }
                 }
 
                 if depth != 1 {

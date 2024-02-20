@@ -360,20 +360,7 @@ fn set_generated_chunks(
                                             despawn_entities.clear();
                                         }
 
-                                        if let Some(parent_node) = tree.get_parent_node(tree_depth, chunk_task_data_option.lod_position.to_array()) {
-                                            if let Node(_, _, _, _, child_progress, entities) = parent_node {
-                                                let mut child_progress_lock = child_progress.lock().unwrap();
-                                                *child_progress_lock += 1;
-
-                                                if *child_progress_lock == 4 {
-                                                    for entity in entities {
-                                                        if let Some(mut entity) = commands.get_entity(entity.clone()) {
-                                                            entity.despawn();
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        tree.add_to_parent(tree_depth, chunk_task_data_option.lod_position.to_array(), &mut commands);
                                     }
                                 }
                             }

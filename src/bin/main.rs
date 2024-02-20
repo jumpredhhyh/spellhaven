@@ -9,7 +9,7 @@ use spellhaven::animations::AnimationPlugin;
 use spellhaven::bird_camera::BirdCameraPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::player::PlayerPlugin;
-use spellhaven::ui::fps_ui::FpsUi;
+use spellhaven::ui::ui::GameUiPlugin;
 use spellhaven::world_generation::chunk_generation::ChunkGenerationPlugin;
 
 fn main() {
@@ -26,7 +26,7 @@ fn main() {
             AnimationPlugin,
             //BirdCameraPlugin,
             WorldInspectorPlugin::new(),
-            FpsUi,
+            GameUiPlugin,
             SpellhavenDebugPlugin,
         ))
         .add_systems(Startup, setup)
