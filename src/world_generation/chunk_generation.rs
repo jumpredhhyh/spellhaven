@@ -103,9 +103,19 @@ fn start_chunk_tasks(
     chunk_task_pool: Res<ChunkTaskPool>,
     cache_task_pool: Res<CacheTaskPool>,
     chunk_task_generators: Query<(Entity, &ChunkTaskGenerator)>,
+    chunk_tasks: Query<() , With<ChunkGenerationTask>>,
     mut generation_options: ResMut<GenerationOptionsResource>,
 ) {
-    for (entity, chunk_task_generator) in &chunk_task_generators {
+    let chunk_task_count = chunk_tasks.iter().count();
+
+    if chunk_task_count >= 5 { return; }
+
+    let mut current_added_tasks = 0usize;
+
+    let mut chunk_tasks_vec = chunk_task_generators.iter().collect::<Vec<_>>();
+    chunk_tasks_vec.sort_by(|a, b| a.1.1.usize().cmp(&b.1.1.usize()));
+
+    for (entity, chunk_task_generator) in chunk_tasks_vec {
         let parent_pos = chunk_task_generator.0;
         let country_pos = IVec2::new(parent_pos.x.div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32)), parent_pos.y.div_floor(COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32)));
 
@@ -124,6 +134,8 @@ fn start_chunk_tasks(
                 match country_cache {
                     GenerationState::Generating => {}
                     GenerationState::Some(country_cache) => {
+                        current_added_tasks += 1;
+
                         let generation_options = generation_options.0.clone();
                         let chunk_lod = chunk_task_generator.1;
                         let lod_pos = chunk_task_generator.2;
@@ -142,6 +154,10 @@ fn start_chunk_tasks(
                     }
                 }
             }
+        }
+
+        if chunk_task_count + current_added_tasks >= 5 {
+            return;
         }
     }
 }
@@ -369,29 +385,32 @@ fn set_generated_chunks(
                 }
             }
 
-            if let Some(chunk_task_data) = chunk_task_data_option.task_data {
-                commands
-                    .entity(entity)
-                    .remove::<ChunkGenerationTask>()
-                    .insert((
-                        PbrBundle {
-                            mesh: meshes.add(chunk_task_data.mesh),
-                            material: materials.add(Color::rgb(1., 1., 1.).into()),
-                            transform: chunk_task_data.transform,
-                            ..default()
-                        },
-                        Chunk([chunk_task_data_option.parent_pos[0], chunk_task_data_option.chunk_height, chunk_task_data_option.parent_pos[1]]),
-                        //SpawnAnimation::default()
-                    ));
 
-                if chunk_task_data_option.lod == ChunkLod::Full {
-                    commands.entity(entity).insert((
-                        RigidBody::Fixed,
-                        chunk_task_data.collider.unwrap(),
-                    ));
+            if let Some(mut current_entity) = commands.get_entity(entity) {
+                if let Some(chunk_task_data) = chunk_task_data_option.task_data {
+                    current_entity
+                        .remove::<ChunkGenerationTask>()
+                        .insert((
+                            PbrBundle {
+                                mesh: meshes.add(chunk_task_data.mesh),
+                                material: materials.add(Color::rgb(1., 1., 1.).into()),
+                                transform: chunk_task_data.transform,
+                                ..default()
+                            },
+                            Chunk([chunk_task_data_option.parent_pos[0], chunk_task_data_option.chunk_height, chunk_task_data_option.parent_pos[1]]),
+                            //SpawnAnimation::default()
+                        ));
+
+                    if chunk_task_data_option.lod == ChunkLod::Full {
+                        current_entity.insert((
+                            RigidBody::Fixed,
+                            chunk_task_data.collider.unwrap(),
+                        ));
+                    }
+
+                } else {
+                    current_entity.despawn();
                 }
-            } else {
-                commands.entity(entity).despawn();
             }
         }
     }
