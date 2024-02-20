@@ -3,7 +3,7 @@ use bevy::prelude::{Commands, Entity};
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode::Node;
 
 pub enum QuadTreeNode<T> {
-    Data(T),
+    Data(T, Vec<Entity>),
     Node(Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Arc<Mutex<i32>>, Vec<Entity>)
 }
 
@@ -28,7 +28,7 @@ impl Into<i32> for QuadTreeDistinction {
 impl<T> QuadTreeNode<T> {
     pub fn run_on_data<F>(&self, closure: F) where F: Fn(&T) {
         match self {
-            QuadTreeNode::Data(data) => {closure(data)}
+            QuadTreeNode::Data(data, _) => {closure(data)}
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 a.run_on_data(&closure);
                 b.run_on_data(&closure);
@@ -61,12 +61,12 @@ impl<T> QuadTreeNode<T> {
     }
 
     pub fn get_parent_node(&mut self, depth: i32, position: [i32; 2]) -> Option<&QuadTreeNode<T>> {
-        if depth == 1 {
+        if depth <= 1 {
             return Some(self);
         }
 
         return match self {
-            QuadTreeNode::Data(_) => { None }
+            QuadTreeNode::Data(_, _) => { None }
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 let divider = 2_i32.pow(depth as u32 - 1);
 
@@ -87,30 +87,27 @@ impl<T> QuadTreeNode<T> {
         }
     }
 
-    pub fn get_data(&mut self, depth: i32, position: [i32; 2]) -> Option<&mut T> {
+    pub fn get_node(&mut self, depth: i32, position: [i32; 2]) -> Option<&mut Self> {
         if depth == 0 {
-            return match self {
-                QuadTreeNode::Data(data) => {Some(data)}
-                QuadTreeNode::Node(_, _, _, _, _, _) => {None}
-            };
+            return Some(self);
         }
 
         return match self {
-            QuadTreeNode::Data(_) => {None}
+            QuadTreeNode::Data(_, _) => {None}
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 let divider = 2_i32.pow(depth as u32 - 1);
 
                 return if position[0] / divider == 0 {
                     if position[1] / divider == 0 {
-                        a.get_data(depth - 1, position)
+                        a.get_node(depth - 1, position)
                     } else {
-                        c.get_data(depth - 1, [position[0], position[1] - divider])
+                        c.get_node(depth - 1, [position[0], position[1] - divider])
                     }
                 } else {
                     if position[1] / divider == 0 {
-                        b.get_data(depth - 1, [position[0] - divider, position[1]])
+                        b.get_node(depth - 1, [position[0] - divider, position[1]])
                     } else {
-                        d.get_data(depth - 1, [position[0] - divider, position[1] - divider])
+                        d.get_node(depth - 1, [position[0] - divider, position[1] - divider])
                     }
                 }
             }
