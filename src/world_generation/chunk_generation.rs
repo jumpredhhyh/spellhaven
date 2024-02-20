@@ -134,23 +134,25 @@ fn start_chunk_tasks(
                 match country_cache {
                     GenerationState::Generating => {}
                     GenerationState::Some(country_cache) => {
-                        current_added_tasks += 1;
+                        if let Some(mut entity) = commands.get_entity(entity) {
+                            current_added_tasks += 1;
 
-                        let generation_options = generation_options.0.clone();
-                        let chunk_lod = chunk_task_generator.1;
-                        let lod_pos = chunk_task_generator.2;
-                        let height = chunk_task_generator.3;
-                        let country_cache = country_cache.clone();
-                        let task = chunk_task_pool.0.spawn(async move {
-                            QuadTreeVoxelWorld::generate_chunk(parent_pos, chunk_lod, lod_pos, generation_options, height, &country_cache)
-                        });
+                            let generation_options = generation_options.0.clone();
+                            let chunk_lod = chunk_task_generator.1;
+                            let lod_pos = chunk_task_generator.2;
+                            let height = chunk_task_generator.3;
+                            let country_cache = country_cache.clone();
+                            let task = chunk_task_pool.0.spawn(async move {
+                                QuadTreeVoxelWorld::generate_chunk(parent_pos, chunk_lod, lod_pos, generation_options, height, &country_cache)
+                            });
 
-                        commands.entity(entity)
-                            .remove::<ChunkTaskGenerator>()
-                            .insert(ChunkGenerationTask(
-                                task,
-                                chunk_task_generator.4
-                            ));
+                            entity
+                                .remove::<ChunkTaskGenerator>()
+                                .insert(ChunkGenerationTask(
+                                    task,
+                                    chunk_task_generator.4
+                                ));
+                        }
                     }
                 }
             }
@@ -233,6 +235,7 @@ pub(crate) fn upgrade_quad_trees(
     mut voxel_world: ResMut<QuadTreeVoxelWorld>,
     chunks: Query<(Entity, &ChunkParent)>,
     chunk_loaders: Query<(&ChunkLoader, &Transform)>,
+    generated_chunks: Query<Entity, With<Chunk>>,
 ) {
     for chunk in &chunks {
         let boxed_tree = voxel_world.get_chunk(chunk.1.0).expect("Chunk not found!");
@@ -240,7 +243,7 @@ pub(crate) fn upgrade_quad_trees(
         match &**boxed_tree {
             None => {}
             Some(chunk_tree) => {
-                let tree = upgrade_tree_recursion(chunk.0, chunk_tree, MAX_LOD, [0, 0], chunk.1.0, &chunk_loaders, &mut commands);
+                let tree = upgrade_tree_recursion(chunk.0, chunk_tree, MAX_LOD, [0, 0], chunk.1.0, &chunk_loaders, &mut commands, &generated_chunks);
 
                 **boxed_tree = Some(tree);
             }
@@ -248,7 +251,7 @@ pub(crate) fn upgrade_quad_trees(
     }
 }
 
-fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32, Entity>>, current_lod: ChunkLod, current_lod_pos: [i32; 2], owner_chunk_pos: [i32; 2], chunk_loaders: &Query<(&ChunkLoader, &Transform)>, commands: &mut Commands) -> QuadTreeNode<HashMap<i32, Entity>> {
+fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32, Entity>>, current_lod: ChunkLod, current_lod_pos: [i32; 2], owner_chunk_pos: [i32; 2], chunk_loaders: &Query<(&ChunkLoader, &Transform)>, commands: &mut Commands, generated_chunks: &Query<Entity, With<Chunk>>) -> QuadTreeNode<HashMap<i32, Entity>> {
     match current_node {
         Data(children, entities) => {
             let mut divide = false;
@@ -269,13 +272,15 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
                 return Data(children.clone(), entities.clone());
             }
 
+            let entities = check_entities_for_deletion([children.clone().into_values().collect(), entities.clone()].concat(), commands, generated_chunks);
+
             Node(
                 Box::new(generate_quad_tree_chunk(owner, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands, vec![])),
                 Box::new(generate_quad_tree_chunk(owner, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands, vec![])),
                 Box::new(generate_quad_tree_chunk(owner, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, vec![])),
                 Box::new(generate_quad_tree_chunk(owner, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, vec![])),
                 Arc::new(Mutex::new(0)),
-                [children.clone().into_values().collect(), entities.clone()].concat(),
+                entities,
             )
         }
         Node(a, b, c, d, current_mutex, current_entity) => {
@@ -295,10 +300,10 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
 
             if divide {
                 return Node(
-                    Box::new(upgrade_tree_recursion(owner, &**a, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands)),
-                    Box::new(upgrade_tree_recursion(owner, &**b, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands)),
-                    Box::new(upgrade_tree_recursion(owner, &**c, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands)),
-                    Box::new(upgrade_tree_recursion(owner, &**d, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands)),
+                    Box::new(upgrade_tree_recursion(owner, &**a, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
+                    Box::new(upgrade_tree_recursion(owner, &**b, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
+                    Box::new(upgrade_tree_recursion(owner, &**c, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
+                    Box::new(upgrade_tree_recursion(owner, &**d, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
                     current_mutex.clone(),
                     current_entity.clone()
                 );
@@ -311,9 +316,29 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
                 get_entities_recursive(&**d),
             ].concat();
 
+            let entities = check_entities_for_deletion(entities, commands, generated_chunks);
+
             generate_quad_tree_chunk(owner, current_lod, current_lod_pos, owner_chunk_pos, chunk_loaders, commands, entities)
         }
     }
+}
+
+fn check_entities_for_deletion(entities: Vec<Entity>, commands: &mut Commands, generated_chunks: &Query<Entity, With<Chunk>>) -> Vec<Entity> {
+    let mut new_entities = vec![];
+
+    for entity in entities {
+        if generated_chunks.get(entity).is_ok() {
+            new_entities.push(entity);
+        } else {
+            if let Some(mut entity) = commands.get_entity(entity) {
+                entity.despawn();
+            } else {
+                new_entities.push(entity);
+            }
+        }
+    }
+
+    new_entities
 }
 
 fn get_entities_recursive(current_node: &QuadTreeNode<HashMap<i32, Entity>>) -> Vec<Entity> {
@@ -455,9 +480,9 @@ fn draw_path_gizmos(
                 match country_cache {
                     GenerationState::Some(country_cache) => {
                         for path in country_cache.this_path_cache.paths.iter().chain(&country_cache.bottom_path_cache.paths).chain(&country_cache.left_path_cache.paths) {
-                            if path.is_in_box(player_voxel_pos, IVec2::ONE * 500) {
+                            if path.is_in_box(player_voxel_pos, IVec2::ONE * debug_resource.path_show_range) {
                                 for path_line in &path.lines {
-                                    if path_line.is_in_box(player_voxel_pos, IVec2::ONE * 500) {
+                                    if path_line.is_in_box(player_voxel_pos, IVec2::ONE * debug_resource.path_show_range) {
                                         let is_in_path = path_line.is_in_box(player_voxel_pos, IVec2::ONE * 5);
                                         let color = if is_in_path { Color::ORANGE } else { Color::GREEN };
                                         gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, color);

@@ -18,13 +18,15 @@ impl Plugin for SpellhavenDebugPlugin {
 pub struct SpellhavenDebug {
     pub show_path_debug: bool,
     pub path_circle_radius: f32,
+    pub path_show_range: i32,
 }
 
 impl Default for SpellhavenDebug {
     fn default() -> Self {
         Self {
             show_path_debug: false,
-            path_circle_radius: 1.
+            path_circle_radius: 1.,
+            path_show_range: 500,
         }
     }
 }
