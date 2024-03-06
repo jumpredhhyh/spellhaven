@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use bevy::prelude::{Commands, Entity};
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode::Node;
 
+#[derive(Debug)]
 pub enum QuadTreeNode<T> {
     Data(T, Vec<Entity>),
     Node(Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Arc<Mutex<i32>>, Vec<Entity>)

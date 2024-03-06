@@ -283,7 +283,7 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
                 entities,
             )
         }
-        Node(a, b, c, d, current_mutex, current_entity) => {
+        Node(a, b, c, d, current_mutex, current_entities) => {
             let mut divide = false;
 
             if current_lod != ChunkLod::Full {
@@ -305,7 +305,7 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
                     Box::new(upgrade_tree_recursion(owner, &**c, current_lod.previous(), [current_lod_pos[0] * 2, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
                     Box::new(upgrade_tree_recursion(owner, &**d, current_lod.previous(), [current_lod_pos[0] * 2 + 1, current_lod_pos[1] * 2 + 1], owner_chunk_pos, chunk_loaders, commands, generated_chunks)),
                     current_mutex.clone(),
-                    current_entity.clone()
+                    current_entities.clone()
                 );
             }
 
@@ -314,6 +314,7 @@ fn upgrade_tree_recursion(owner: Entity, current_node: &QuadTreeNode<HashMap<i32
                 get_entities_recursive(&**b),
                 get_entities_recursive(&**c),
                 get_entities_recursive(&**d),
+                current_entities.clone(),
             ].concat();
 
             let entities = check_entities_for_deletion(entities, commands, generated_chunks);
@@ -343,15 +344,16 @@ fn check_entities_for_deletion(entities: Vec<Entity>, commands: &mut Commands, g
 
 fn get_entities_recursive(current_node: &QuadTreeNode<HashMap<i32, Entity>>) -> Vec<Entity> {
     match current_node {
-        Data(entities, _) => {
-            entities.clone().into_values().collect()
+        Data(entities, despawn_children) => {
+            [entities.clone().into_values().collect(), despawn_children.clone()].concat()
         }
-        Node(a, b, c, d, _, _) => {
+        Node(a, b, c, d, _, despawn_entities) => {
             [
                 get_entities_recursive(&**a),
                 get_entities_recursive(&**b),
                 get_entities_recursive(&**c),
                 get_entities_recursive(&**d),
+                despawn_entities.clone()
             ].concat()
         }
     }
@@ -374,7 +376,9 @@ fn set_generated_chunks(
                         None => {info!("Owner not found!")}
                         Some(ref mut tree) => {
                             match tree.get_node(tree_depth, chunk_task_data_option.lod_position.to_array()) {
-                                None => { info!("Map not found! depth: {0}, pos: [{1}, {2}]", <ChunkLod as Into<i32>>::into(MAX_LOD) - <ChunkLod as Into<i32>>::into(chunk_task_data_option.lod), chunk_task_data_option.lod_position[0], chunk_task_data_option.lod_position[1]) }
+                                None => {
+                                    info!("Map not found! depth: {0}, pos: [{1}, {2}]", <ChunkLod as Into<i32>>::into(MAX_LOD) - <ChunkLod as Into<i32>>::into(chunk_task_data_option.lod), chunk_task_data_option.lod_position[0], chunk_task_data_option.lod_position[1]);
+                                }
                                 Some(node) => {
                                     if chunk_task_data_option.generate_above {
                                         if let Data(map, _) = node {
