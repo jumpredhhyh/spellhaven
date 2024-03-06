@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
+use crate::debug_tools::debug_resource::SpellhavenDebug;
 use crate::world_generation::chunk_generation::VOXEL_SIZE;
 use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
 
@@ -121,8 +122,13 @@ fn move_body(
 
 fn move_camera(
     player: Query<&Transform, (With<Player>, Without<PlayerCamera>)>,
-    mut camera: Query<&mut PanOrbitCamera, (With<PlayerCamera>, Without<Player>)>
+    mut camera: Query<&mut PanOrbitCamera, (With<PlayerCamera>, Without<Player>)>,
+    options: Res<SpellhavenDebug>,
 ) {
+    if options.unlock_camera {
+        return;
+    }
+
     let camera_position = camera.single().target_focus;
     let difference = (player.single().translation + Vec3::Y) - camera_position;
     camera.single_mut().target_focus += difference * 0.25;
