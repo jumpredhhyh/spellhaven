@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
+use bevy::render::render_asset::RenderAssetUsages;
 use rand::Rng;
 use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 use crate::world_generation::voxel_world::ChunkLod;
 
 pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool), chunk_lod: ChunkLod) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -299,7 +300,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
-    mesh.set_indices(Some(Indices::U32(mesh_triangles)));
+    mesh.insert_indices(Indices::U32(mesh_triangles));
 
     (Some((mesh, collider_positions, if chunk_lod == ChunkLod::Full { triangles } else { Vec::new() })), generate_more)
 }

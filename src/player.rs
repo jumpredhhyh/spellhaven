@@ -1,4 +1,6 @@
+use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
+use bevy::render::camera::Exposure;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
@@ -13,7 +15,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, setup)
+            .add_systems(Startup, spawn_player)
             .add_systems(Update, (movement, move_camera, move_body));
     }
 }
@@ -43,7 +45,7 @@ struct PlayerSteppingCastZ;
 #[derive(Component)]
 struct PlayerSteppingCastNegZ;
 
-fn setup(
+fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -75,6 +77,7 @@ fn setup(
                 far: 2f32.powi(20),
                 ..default()
             }),
+            exposure: Exposure{ev100: 10f32},
             ..default()
         },
         PanOrbitCamera::default(),
@@ -98,13 +101,13 @@ fn setup(
         ));
         commands.spawn((
             PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Capsule {
+                mesh: meshes.add(Mesh::from(Capsule3d {
                     radius: 0.4,
-                    depth: 0.3,
+                    half_length: 0.3,
                     ..default()
                 })),
                 transform: Transform::from_xyz(0., -0.35, 0.),
-                material: materials.add(Color::rgb(0.8, 0.7, 0.6).into()),
+                material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
                 ..default()
             },
             Name::new("PlayerTorso")
@@ -116,8 +119,12 @@ fn move_body(
     player: Query<&Transform, (With<Player>, Without<PlayerBody>)>,
     mut player_body: Query<&mut Transform, (With<PlayerBody>, Without<Player>)>
 ) {
-    let difference = player.single().translation - player_body.single().translation;
-    player_body.single_mut().translation += difference * 0.25;
+    let (Ok(player), Ok(mut player_body)) = (player.get_single(), player_body.get_single_mut()) else {
+        return;
+    };
+
+    let difference = player.translation - player_body.translation;
+    player_body.translation += difference * 0.25;
 }
 
 fn move_camera(
@@ -129,19 +136,23 @@ fn move_camera(
         return;
     }
 
-    let camera_position = camera.single().target_focus;
-    let difference = (player.single().translation + Vec3::Y) - camera_position;
-    camera.single_mut().target_focus += difference * 0.25;
+    let (Ok(player), Ok(mut camera)) = (player.get_single(), camera.get_single_mut()) else {
+        return;
+    };
+
+    let camera_position = camera.target_focus;
+    let difference = (player.translation + Vec3::Y) - camera_position;
+    camera.target_focus += difference * 0.25;
 }
 
 fn movement(
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut players: Query<(&mut KinematicCharacterController, &mut Player, Option<&KinematicCharacterControllerOutput>)>,
     player_camera: Query<&PanOrbitCamera, With<PlayerCamera>>
 ) {
     for (mut controller, mut player, controller_output) in &mut players {
-        if keyboard_input.just_pressed(KeyCode::F) {
+        if keyboard_input.just_pressed(KeyCode::KeyF) {
             player.fly = !player.fly;
         }
         
@@ -157,23 +168,23 @@ fn movement(
         last_movement.z *= 0.8;
 
         // Directional movement
-        if keyboard_input.pressed(KeyCode::W) || keyboard_input.pressed(KeyCode::Up) {
+        if keyboard_input.pressed(KeyCode::KeyW) || keyboard_input.pressed(KeyCode::ArrowUp) {
             move_direction.z -= 1.;
         }
-        if keyboard_input.pressed(KeyCode::A) || keyboard_input.pressed(KeyCode::Left) {
+        if keyboard_input.pressed(KeyCode::KeyA) || keyboard_input.pressed(KeyCode::ArrowLeft) {
             move_direction.x -= 1.;
         }
-        if keyboard_input.pressed(KeyCode::S) || keyboard_input.pressed(KeyCode::Down) {
+        if keyboard_input.pressed(KeyCode::KeyS) || keyboard_input.pressed(KeyCode::ArrowDown) {
             move_direction.z += 1.;
         }
-        if keyboard_input.pressed(KeyCode::D) || keyboard_input.pressed(KeyCode::Right) {
+        if keyboard_input.pressed(KeyCode::KeyD) || keyboard_input.pressed(KeyCode::ArrowRight) {
             move_direction.x += 1.;
         }
         if player.fly {
-            if keyboard_input.pressed(KeyCode::E) {
+            if keyboard_input.pressed(KeyCode::KeyE) {
                 move_direction.y += 1.;
             }
-            if keyboard_input.pressed(KeyCode::Q) {
+            if keyboard_input.pressed(KeyCode::KeyQ) {
                 move_direction.y -= 1.;
             }
         }

@@ -7,6 +7,7 @@ use noise::core::worley::distance_functions::euclidean;
 use noise::core::worley::ReturnType;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
+use crate::utils::div_floor;
 use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE};
 use crate::world_generation::chunk_generation::noise::fractal_open_simplex::FractalOpenSimplex;
 use crate::world_generation::chunk_generation::noise::roughness::Roughness;
@@ -86,8 +87,8 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
             }
 
             for structure in &generation_options.structures {
-                let structure_offset_x = (total_x + structure.grid_offset[0]).div_floor(structure.generation_size[0]);
-                let structure_offset_z = (total_z + structure.grid_offset[1]).div_floor(structure.generation_size[1]);
+                let structure_offset_x = div_floor(total_x + structure.grid_offset[0], structure.generation_size[0]);
+                let structure_offset_z = div_floor(total_z + structure.grid_offset[1], structure.generation_size[1]);
                 let structure_value = structure.noise.get_noise(structure_offset_x as f32, structure_offset_z as f32) * 0.5 + 0.5;
                 if structure.generate_debug_blocks {
                     let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f32 + min_height as f32) as i32 - min_height.min(noise_height as i32)).max(1) as usize - 1;
@@ -130,7 +131,7 @@ pub fn generate_voxels(position: [i32; 3], generation_options: &GenerationOption
                         if (index as i32 + (noise_height * chunk_lod.multiplier_i32() as f64) as i32) % chunk_lod.multiplier_i32() != 0 {
                             continue;
                         }
-                        let chunk_index = index.div_floor(chunk_lod.multiplier_i32() as usize);
+                        let chunk_index = index / chunk_lod.multiplier_i32() as usize;
                         if (noise_height as i32 - min_height + chunk_index as i32) < 0 {
                             continue;
                         }

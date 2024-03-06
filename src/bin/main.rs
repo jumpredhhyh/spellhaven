@@ -6,7 +6,6 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use spellhaven::animations::AnimationPlugin;
-use spellhaven::bird_camera::BirdCameraPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::player::PlayerPlugin;
 use spellhaven::ui::ui::GameUiPlugin;
@@ -59,8 +58,8 @@ fn setup(
     ));
 
     commands.insert_resource(AmbientLight {
-        color: Color::ANTIQUE_WHITE,
-        brightness: 0.05,
+        color: Color::WHITE,
+        brightness: 50f32,
     });
 
     // commands.spawn(SceneBundle {
