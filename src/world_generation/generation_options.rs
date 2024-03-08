@@ -15,13 +15,11 @@ use crate::world_generation::chunk_loading::country_cache::{CountryCache, PathCa
 #[derive(Resource)]
 pub struct GenerationOptionsResource(pub Arc<GenerationOptions>, pub HashMap<IVec2, GenerationState<CountryCache>>);
 
-impl Default for GenerationOptionsResource {
-    fn default() -> Self {
+impl GenerationOptionsResource {
+    pub fn from_seed(seed: u64) -> Self {
         let tree = vox_data_to_structure_data(&from_file("assets/tree_2.vox").unwrap());
         let tree_house = vox_data_to_structure_data(&from_file("assets/tree_house.vox").unwrap());
         let box_structure = vox_data_to_structure_data(&from_file("assets/box.vox").unwrap());
-
-        let seed = 3;
 
         let mut rng = StdRng::seed_from_u64(seed);
 
@@ -63,6 +61,12 @@ impl Default for GenerationOptionsResource {
             }),
             1: HashMap::new(),
         }
+    }
+}
+
+impl Default for GenerationOptionsResource {
+    fn default() -> Self {
+        Self::from_seed(3)
     }
 }
 

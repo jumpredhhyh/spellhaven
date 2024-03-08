@@ -1,10 +1,11 @@
-use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
 use crate::debug_tools::debug_resource::SpellhavenDebug;
+use crate::ui::ui::UiSpawnCallback;
 use crate::world_generation::chunk_generation::VOXEL_SIZE;
 use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
 
@@ -15,7 +16,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, spawn_player)
+            .add_systems(Startup, register_spawn_player_system)
             .add_systems(Update, (movement, move_camera, move_body));
     }
 }
@@ -45,11 +46,20 @@ struct PlayerSteppingCastZ;
 #[derive(Component)]
 struct PlayerSteppingCastNegZ;
 
+#[derive(Resource)]
+pub struct PlayerSpawnCallback(pub SystemId);
+
+fn register_spawn_player_system(world: &mut World) {
+    let id = world.register_system(spawn_player);
+    world.insert_resource(PlayerSpawnCallback(id));
+}
+
 fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
+    ui_spawn_callback: Res<UiSpawnCallback>,
 ) {
     // Player
     commands.spawn((
@@ -113,6 +123,8 @@ fn spawn_player(
             Name::new("PlayerTorso")
         ));
     });
+
+    commands.run_system(ui_spawn_callback.0);
 }
 
 fn move_body(
@@ -195,8 +207,10 @@ fn movement(
             movement_speed *= 50.;
         }
 
-        // Rotate vector to camera
-        move_direction = Quat::from_rotation_y(player_camera.single().alpha.unwrap_or(0.)).mul_vec3(move_direction.normalize_or_zero() * movement_speed);
+        if let Ok(player_camera) = player_camera.get_single() {
+            // Rotate vector to camera
+            move_direction = Quat::from_rotation_y(player_camera.alpha.unwrap_or(0.)).mul_vec3(move_direction.normalize_or_zero() * movement_speed);
+        }
 
         if !player.fly && controller_output.is_some() && !controller_output.unwrap().grounded {
             move_direction.y -= 0.4;

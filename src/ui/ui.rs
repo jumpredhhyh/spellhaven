@@ -1,7 +1,9 @@
 use bevy::app::App;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
+use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 use crate::ui::fps_text::{FpsText, update_fps_ui};
+use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::task_text::{ChunkTaskText, CountryTaskText, update_task_ui};
 
 pub struct GameUiPlugin;
@@ -9,10 +11,18 @@ pub struct GameUiPlugin;
 impl Plugin for GameUiPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_plugins(FrameTimeDiagnosticsPlugin::default())
-            .add_systems(Startup, spawn_ui)
+            .add_plugins((FrameTimeDiagnosticsPlugin::default(), MainMenuPlugin::default()))
+            .add_systems(Startup, register_spawn_ui_system)
             .add_systems(Update, (update_fps_ui, update_task_ui));
     }
+}
+
+#[derive(Resource)]
+pub struct UiSpawnCallback(pub SystemId);
+
+fn register_spawn_ui_system(world: &mut World) {
+    let id = world.register_system(spawn_ui);
+    world.insert_resource(UiSpawnCallback(id));
 }
 
 fn spawn_ui(mut commands: Commands) {
