@@ -1,10 +1,15 @@
+use std::f32::consts::PI;
+use bevy::core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin};
 use bevy::ecs::system::SystemId;
+use bevy::pbr::ScreenSpaceAmbientOcclusionBundle;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
+use bevy::transform;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
 use crate::debug_tools::debug_resource::SpellhavenDebug;
+use crate::player;
 use crate::ui::ui::UiSpawnCallback;
 use crate::world_generation::chunk_generation::VOXEL_SIZE;
 use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
@@ -16,6 +21,8 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
+            .add_plugins(TemporalAntiAliasPlugin)
+            .insert_resource(Msaa::Off)
             .add_systems(Startup, register_spawn_player_system)
             .add_systems(Update, (movement, move_camera, move_body));
     }
@@ -93,8 +100,9 @@ fn spawn_player(
         PanOrbitCamera::default(),
         AtmosphereCamera::default(),
         PlayerCamera,
-        Name::new("PlayerCamera")
-    ));
+        Name::new("PlayerCamera"),
+        ScreenSpaceAmbientOcclusionBundle::default(),
+    )).insert(TemporalAntiAliasBundle::default());
 
     commands.spawn((
         PbrBundle::default(),
@@ -137,6 +145,7 @@ fn move_body(
 
     let difference = player.translation - player_body.translation;
     player_body.translation += difference * 0.25;
+    player_body.rotation = player_body.rotation.lerp(player.rotation, 0.25);
 }
 
 fn move_camera(
@@ -160,19 +169,21 @@ fn move_camera(
 fn movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut players: Query<(&mut KinematicCharacterController, &mut Player, Option<&KinematicCharacterControllerOutput>)>,
+    mut players: Query<(&mut KinematicCharacterController, &mut Player, Option<&KinematicCharacterControllerOutput>, &mut Transform)>,
     player_camera: Query<&PanOrbitCamera, With<PlayerCamera>>
 ) {
-    for (mut controller, mut player, controller_output) in &mut players {
+    for (mut controller, mut player, controller_output, mut transform) in &mut players {
         if keyboard_input.just_pressed(KeyCode::KeyF) {
             player.fly = !player.fly;
         }
-        
+
         let mut move_direction = Vec3::ZERO;
         let mut last_movement = player.velocity;
 
-        if player.jumped && controller_output.is_some() && controller_output.unwrap().grounded {
-            player.jumped = false;
+        if let Some(controller_output) = controller_output {
+            if player.jumped && controller_output.grounded {
+                player.jumped = false;
+            }
         }
 
         last_movement.x *= 0.8;
@@ -209,7 +220,8 @@ fn movement(
 
         if let Ok(player_camera) = player_camera.get_single() {
             // Rotate vector to camera
-            move_direction = Quat::from_rotation_y(player_camera.alpha.unwrap_or(0.)).mul_vec3(move_direction.normalize_or_zero() * movement_speed);
+            let rotation = Quat::from_rotation_y(player_camera.alpha.unwrap_or(0.));
+            move_direction = rotation.mul_vec3(move_direction.normalize_or_zero() * movement_speed);
         }
 
         if !player.fly && controller_output.is_some() && !controller_output.unwrap().grounded {
@@ -227,6 +239,11 @@ fn movement(
         let movement = move_direction + last_movement;
         controller.translation = Some(movement);
         player.velocity = movement;
+
+        move_direction.y = 0.0;
+        if move_direction.max_element() > 0.0 || move_direction.min_element() < 0.0 {
+            transform.rotation = Quat::from_rotation_y(-move_direction.xz().to_angle() - PI / 2.0);
+        }
     }
 }
 
