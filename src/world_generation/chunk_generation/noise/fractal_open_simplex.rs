@@ -3,7 +3,7 @@ use noise::permutationtable::PermutationTable;
 use noise::{NoiseFn, Seedable};
 
 #[derive(Clone, Copy, Debug)]
-pub struct FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
+pub struct FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     seed: u32,
     frequency: f64,
     amplitude: f64,
@@ -14,7 +14,7 @@ pub struct FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
     roughness: R,
 }
 
-impl<R> FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
+impl<R> FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     pub const DEFAULT_SEED: u32 = 0;
 
     pub fn new(seed: u32, frequency: f64, amplitude: f64, octaves: i32, lacunarity: f64, persistence: f64, roughness: R) -> Self {
@@ -31,7 +31,7 @@ impl<R> FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
     }
 }
 
-impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
+impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     fn set_seed(self, seed: u32) -> Self {
         if self.seed == seed {
             return self;
@@ -54,10 +54,10 @@ impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
     }
 }
 
-impl<R> NoiseFn<i32, 2usize> for FractalOpenSimplex<R> where R: NoiseFn<i32, 2usize> {
-    fn get(&self, point: [i32; 2]) -> f64 {
+impl<R> NoiseFn<f64, 2usize> for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
+    fn get(&self, point: [f64; 2]) -> f64 {
         let roughness = self.roughness.get(point);
-        fractal_noise(point[0] as f64, point[1] as f64, self.frequency, self.amplitude, self.octaves, self.lacunarity, self.persistence + roughness, &self.permutation_table).max(2.)
+        fractal_noise(point[0], point[1], self.frequency, self.amplitude, self.octaves, self.lacunarity, self.persistence + roughness, &self.permutation_table).max(2.)
     }
 }
 

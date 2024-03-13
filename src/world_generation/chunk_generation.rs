@@ -37,6 +37,7 @@ pub enum BlockType {
     Grass,
     Sand,
     Path,
+    Snow,
     Gray(u8),
     Custom(u8, u8, u8),
     StructureDebug(u8, u8, u8),
@@ -52,7 +53,8 @@ impl BlockType {
             BlockType::Sand => [225. / 255., 195. / 255., 90. / 255., 1.],
             BlockType::Custom(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
             BlockType::StructureDebug(r, g, b) => [*r as f32 / 255., *g as f32 / 255., *b as f32 / 255., 1.],
-            BlockType::Path => [100. / 255., 65. / 255., 50. / 255., 1.]
+            BlockType::Path => [100. / 255., 65. / 255., 50. / 255., 1.],
+            BlockType::Snow => [5., 5., 5., 1.]
         }
     }
 }
@@ -423,7 +425,7 @@ fn set_generated_chunks(
                         .insert((
                             PbrBundle {
                                 mesh: meshes.add(chunk_task_data.mesh),
-                                material: materials.add(Color::rgb(1., 1., 1.)),
+                                material: materials.add(Color::WHITE),
                                 transform: chunk_task_data.transform,
                                 ..default()
                             },
@@ -491,24 +493,24 @@ fn draw_path_gizmos(
                                     if path_line.is_in_box(player_voxel_pos, IVec2::ONE * debug_resource.path_show_range) {
                                         let is_in_path = path_line.is_in_box(player_voxel_pos, IVec2::ONE * 5);
                                         let color = if is_in_path { Color::ORANGE } else { Color::GREEN };
-                                        gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, color);
+                                        gizmos.line(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, color);
                                         if is_in_path {
-                                            gizmos.circle(Vec3::from((path_line.spline_one, terrain_noise.get(path_line.spline_one.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::GREEN);
-                                            gizmos.circle(Vec3::from((path_line.spline_two, terrain_noise.get(path_line.spline_two.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::RED);
-                                            gizmos.circle(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::GREEN);
-                                            gizmos.circle(Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::RED);
+                                            gizmos.circle(Vec3::from((path_line.spline_one, terrain_noise.get(path_line.spline_one.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::GREEN);
+                                            gizmos.circle(Vec3::from((path_line.spline_two, terrain_noise.get(path_line.spline_two.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::RED);
+                                            gizmos.circle(Vec3::from((path_line.start.as_vec2(), terrain_noise.get(path_line.start.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::GREEN);
+                                            gizmos.circle(Vec3::from((path_line.end.as_vec2(), terrain_noise.get(path_line.end.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::RED);
 
                                             for i in 1..path_line.sample_points.len() {
                                                 let start = path_line.sample_points[i - 1];
                                                 let end = path_line.sample_points[i];
-                                                gizmos.line(Vec3::from((start.as_vec2(), terrain_noise.get(start.to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((end.as_vec2(), terrain_noise.get(end.to_array()) as f32)).xzy() * VOXEL_SIZE, Color::RED);
+                                                gizmos.line(Vec3::from((start.as_vec2(), terrain_noise.get(start.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Vec3::from((end.as_vec2(), terrain_noise.get(end.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Color::RED);
                                             }
 
                                             if let Some((player_pos_on_path, _)) = path_line.closest_point_on_path(player_voxel_pos, IVec2::ONE * 5) {
-                                                gizmos.circle(Vec3::from((player_pos_on_path, terrain_noise.get(player_pos_on_path.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::BLUE);
-                                                gizmos.circle(Vec3::from((player_pos_on_path.as_ivec2().as_vec2() + VOXEL_SIZE, terrain_noise.get(player_pos_on_path.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::CYAN);
+                                                gizmos.circle(Vec3::from((player_pos_on_path, terrain_noise.get(player_pos_on_path.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::BLUE);
+                                                gizmos.circle(Vec3::from((player_pos_on_path.as_ivec2().as_vec2() + VOXEL_SIZE, terrain_noise.get(player_pos_on_path.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::CYAN);
 
-                                                gizmos.circle(Vec3::from((player_voxel_pos.as_vec2() + VOXEL_SIZE, terrain_noise.get(player_pos_on_path.as_ivec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::AQUAMARINE);
+                                                gizmos.circle(Vec3::from((player_voxel_pos.as_vec2() + VOXEL_SIZE, terrain_noise.get(player_pos_on_path.as_dvec2().to_array()) as f32)).xzy() * VOXEL_SIZE, Direction3d::Y, debug_resource.path_circle_radius, Color::AQUAMARINE);
                                             }
                                         }
                                     }

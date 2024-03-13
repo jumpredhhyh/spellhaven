@@ -254,7 +254,7 @@ impl PathCache {
         let terrain_noise = get_terrain_noise(path_finding_lod, generation_options);
 
         let get_terrain_height = |pos: IVec2| -> f64 {
-            terrain_noise.get((pos * path_finding_lod.multiplier_i32()).to_array()) * path_finding_lod.multiplier_i32() as f64
+            terrain_noise.get((pos * path_finding_lod.multiplier_i32()).as_dvec2().to_array()) * path_finding_lod.multiplier_i32() as f64
         };
 
         let distance_to_end = |pos: IVec2| -> i32 {
