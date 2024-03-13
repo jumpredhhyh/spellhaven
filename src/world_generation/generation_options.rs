@@ -1,19 +1,24 @@
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::ops::Deref;
-use std::sync::{Arc, RwLock};
+use crate::world_generation::chunk_generation::voxel_generation::StructureGenerator;
+use crate::world_generation::chunk_generation::BlockType;
+use crate::world_generation::chunk_loading::country_cache::{
+    CountryCache, PathCache, StructureCache,
+};
 use bevy::prelude::{IVec2, Resource};
 use bracket_noise::prelude::FastNoise;
 use bracket_noise::prelude::NoiseType::WhiteNoise;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::ops::Deref;
+use std::sync::{Arc, RwLock};
 use vox_format::{from_file, VoxData};
-use crate::world_generation::chunk_generation::BlockType;
-use crate::world_generation::chunk_generation::voxel_generation::StructureGenerator;
-use crate::world_generation::chunk_loading::country_cache::{CountryCache, PathCache, StructureCache};
 
 #[derive(Resource)]
-pub struct GenerationOptionsResource(pub Arc<GenerationOptions>, pub HashMap<IVec2, GenerationState<CountryCache>>);
+pub struct GenerationOptionsResource(
+    pub Arc<GenerationOptions>,
+    pub HashMap<IVec2, GenerationState<CountryCache>>,
+);
 
 impl GenerationOptionsResource {
     pub fn from_seed(seed: u64) -> Self {
@@ -55,7 +60,7 @@ impl GenerationOptionsResource {
                         grid_offset: [7, 11],
                         generate_debug_blocks: false,
                         debug_rgb_multiplier: [1., 1., 1.],
-                    }
+                    },
                 ],
                 structure_assets: vec![StructureAsset((*box_structure.0).clone())],
             }),
@@ -79,7 +84,7 @@ fn get_seeded_white_noise(seed: u64) -> FastNoise {
 
 pub enum GenerationState<T> {
     Generating,
-    Some(T)
+    Some(T),
 }
 
 pub struct GenerationOptions {
@@ -108,24 +113,20 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
     pub fn get_cache_entry(&self, key: K, generation_options: &GenerationOptions) -> Arc<T> {
         self.get_generated_cache_entry(self.get_hash_lock_entry(key), key, generation_options)
     }
-    
+
     pub fn try_get_entry_no_lock(&self, key: K) -> Option<Arc<T>> {
         match self.cache_lock.try_read() {
             Ok(read) => {
                 let entry = read.get(&key)?;
                 match entry.try_read() {
-                    Ok(read) => {
-                        match read.deref() {
-                            None => { None }
-                            Some(t) => {
-                                Some(t.clone())
-                            }
-                        }
-                    }
-                    Err(_) => { None }
+                    Ok(read) => match read.deref() {
+                        None => None,
+                        Some(t) => Some(t.clone()),
+                    },
+                    Err(_) => None,
                 }
             }
-            Err(_) => { None }
+            Err(_) => None,
         }
     }
 
@@ -141,43 +142,39 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
                         write.insert(key, lock);
                         write.get(&key).unwrap().clone()
                     }
-                    Some(cache) => {
-                        cache.clone()
-                    }
+                    Some(cache) => cache.clone(),
                 };
                 drop(write);
                 result
             }
-            Some(cache) => {
-                cache.clone()
-            }
+            Some(cache) => cache.clone(),
         }
     }
 
-    fn get_generated_cache_entry(&self, hash_lock_entry: Arc<RwLock<Option<Arc<T>>>>, key: K, generation_options: &GenerationOptions) -> Arc<T> {
+    fn get_generated_cache_entry(
+        &self,
+        hash_lock_entry: Arc<RwLock<Option<Arc<T>>>>,
+        key: K,
+        generation_options: &GenerationOptions,
+    ) -> Arc<T> {
         let read = hash_lock_entry.read().unwrap();
         match read.deref() {
             None => {
                 drop(read);
                 let mut write = hash_lock_entry.write().unwrap();
                 match write.deref() {
-                    None => {
-                        write.insert(Arc::new(T::generate(key, generation_options))).clone()
-                    }
-                    Some(country_cache) => {
-                        country_cache.clone()
-                    }
+                    None => write
+                        .insert(Arc::new(T::generate(key, generation_options)))
+                        .clone(),
+                    Some(country_cache) => country_cache.clone(),
                 }
             }
-            Some(country_cache) => {
-                country_cache.clone()
-            }
+            Some(country_cache) => country_cache.clone(),
         }
     }
 }
 
 pub struct StructureAsset(Vec<Vec<Vec<BlockType>>>);
-
 
 fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
     let model = vox_data.models.first().unwrap();
@@ -194,7 +191,8 @@ fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
 
     for voxel in model.voxels.iter() {
         let color = vox_data.palette.colors[voxel.color_index.0 as usize];
-        result[voxel.point.x as usize][voxel.point.z as usize][voxel.point.y as usize] = BlockType::Custom(color.r, color.g, color.b);
+        result[voxel.point.x as usize][voxel.point.z as usize][voxel.point.y as usize] =
+            BlockType::Custom(color.r, color.g, color.b);
     }
 
     result
@@ -202,9 +200,16 @@ fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
 
 fn vox_data_model_size(vox_data: &VoxData) -> [i32; 3] {
     let model_size = vox_data.models.first().unwrap().size;
-    [model_size.x as i32, model_size.z as i32, model_size.y as i32]
+    [
+        model_size.x as i32,
+        model_size.z as i32,
+        model_size.y as i32,
+    ]
 }
 
 fn vox_data_to_structure_data(vox_data: &VoxData) -> (Arc<Vec<Vec<Vec<BlockType>>>>, [i32; 3]) {
-    (Arc::new(vox_data_to_blocks(vox_data)), vox_data_model_size(vox_data))
+    (
+        Arc::new(vox_data_to_blocks(vox_data)),
+        vox_data_model_size(vox_data),
+    )
 }

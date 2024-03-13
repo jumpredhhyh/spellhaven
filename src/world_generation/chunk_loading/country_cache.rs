@@ -1,15 +1,15 @@
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap};
-use std::sync::Arc;
+use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
+use crate::world_generation::chunk_generation::BlockType;
+use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptions};
+use crate::world_generation::voxel_world::ChunkLod;
 use bevy::log::info;
 use bevy::math::{IVec2, Vec2};
 use noise::NoiseFn;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
-use crate::world_generation::chunk_generation::BlockType;
-use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
-use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptions};
-use crate::world_generation::voxel_world::ChunkLod;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct CountryCache {
@@ -25,8 +25,8 @@ pub struct StructureCache {
     pub city_location: IVec2,
 }
 
-pub struct  PathCache {
-    pub paths: Vec<Path>
+pub struct PathCache {
+    pub paths: Vec<Path>,
 }
 
 pub struct Path {
@@ -61,8 +61,10 @@ impl PathLine {
 
         let estimated_length = start.as_vec2().distance(end.as_vec2());
 
-        let spline_one = start.as_vec2() + (spline_one - start.as_vec2()).normalize() * (estimated_length / 2.);
-        let spline_two = end.as_vec2() + (spline_two - end.as_vec2()).normalize() * (estimated_length / 2.);
+        let spline_one =
+            start.as_vec2() + (spline_one - start.as_vec2()).normalize() * (estimated_length / 2.);
+        let spline_two =
+            end.as_vec2() + (spline_two - end.as_vec2()).normalize() * (estimated_length / 2.);
 
         let box_pos_start = start.min(end);
         let box_pos_end = start.max(end);
@@ -153,7 +155,8 @@ impl PathLine {
             return line_start.as_vec2();
         }
 
-        let t = ((point - line_start).dot(line_end - line_start) as f32 / length_squared as f32).clamp(0., 1.);
+        let t = ((point - line_start).dot(line_end - line_start) as f32 / length_squared as f32)
+            .clamp(0., 1.);
         let projection = line_start.as_vec2() + t * (line_end - line_start).as_vec2();
 
         projection
@@ -202,18 +205,34 @@ impl GenerationCacheItem<IVec2> for CountryCache {
         Self {
             country_pos: key,
             grass_color: BlockType::Custom(rng.gen(), rng.gen(), rng.gen()),
-            structure_cache: generation_options.structure_cache.get_cache_entry(key, generation_options),
-            this_path_cache: generation_options.path_cache.get_cache_entry(key, generation_options),
-            bottom_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_X, generation_options),
-            left_path_cache: generation_options.path_cache.get_cache_entry(key + IVec2::NEG_Y, generation_options),
+            structure_cache: generation_options
+                .structure_cache
+                .get_cache_entry(key, generation_options),
+            this_path_cache: generation_options
+                .path_cache
+                .get_cache_entry(key, generation_options),
+            bottom_path_cache: generation_options
+                .path_cache
+                .get_cache_entry(key + IVec2::NEG_X, generation_options),
+            left_path_cache: generation_options
+                .path_cache
+                .get_cache_entry(key + IVec2::NEG_Y, generation_options),
         }
     }
 }
 
 impl GenerationCacheItem<IVec2> for StructureCache {
     fn generate(key: IVec2, generation_options: &GenerationOptions) -> Self {
-        let mut rng = StdRng::seed_from_u64(if key.x < 0 {generation_options.seed.wrapping_sub(key.x.abs() as u64)} else {generation_options.seed.wrapping_add(key.x.abs() as u64)});
-        let mut rng = StdRng::seed_from_u64(if key.x < 0 {rng.gen::<u64>().wrapping_sub(key.y.abs() as u64)} else {rng.gen::<u64>().wrapping_add(key.y.abs() as u64)});
+        let mut rng = StdRng::seed_from_u64(if key.x < 0 {
+            generation_options.seed.wrapping_sub(key.x.abs() as u64)
+        } else {
+            generation_options.seed.wrapping_add(key.x.abs() as u64)
+        });
+        let mut rng = StdRng::seed_from_u64(if key.x < 0 {
+            rng.gen::<u64>().wrapping_sub(key.y.abs() as u64)
+        } else {
+            rng.gen::<u64>().wrapping_add(key.y.abs() as u64)
+        });
 
         let min_offset = 100i32;
 
@@ -221,7 +240,7 @@ impl GenerationCacheItem<IVec2> for StructureCache {
         let city_z = rng.gen_range(min_offset..COUNTRY_SIZE as i32 - min_offset);
 
         Self {
-            city_location: IVec2::new(city_x, city_z) + key * COUNTRY_SIZE as i32
+            city_location: IVec2::new(city_x, city_z) + key * COUNTRY_SIZE as i32,
         }
     }
 }
@@ -231,30 +250,58 @@ impl GenerationCacheItem<IVec2> for PathCache {
         let top_country_pos = key + IVec2::X;
         let right_country_pos = key + IVec2::Y;
 
-        let current_structure_cache = generation_options.structure_cache.get_cache_entry(key, generation_options);
-        let top_structure_cache = generation_options.structure_cache.get_cache_entry(top_country_pos, generation_options);
-        let right_structure_cache = generation_options.structure_cache.get_cache_entry(right_country_pos, generation_options);
+        let current_structure_cache = generation_options
+            .structure_cache
+            .get_cache_entry(key, generation_options);
+        let top_structure_cache = generation_options
+            .structure_cache
+            .get_cache_entry(top_country_pos, generation_options);
+        let right_structure_cache = generation_options
+            .structure_cache
+            .get_cache_entry(right_country_pos, generation_options);
 
         let path_finding_lod = ChunkLod::Sixtyfourth;
 
         Self {
             paths: vec![
-                PathCache::generate_path(current_structure_cache.city_location, top_structure_cache.city_location, [key, top_country_pos], path_finding_lod, generation_options),
-                PathCache::generate_path(current_structure_cache.city_location, right_structure_cache.city_location, [key, right_country_pos], path_finding_lod, generation_options),
+                PathCache::generate_path(
+                    current_structure_cache.city_location,
+                    top_structure_cache.city_location,
+                    [key, top_country_pos],
+                    path_finding_lod,
+                    generation_options,
+                ),
+                PathCache::generate_path(
+                    current_structure_cache.city_location,
+                    right_structure_cache.city_location,
+                    [key, right_country_pos],
+                    path_finding_lod,
+                    generation_options,
+                ),
             ],
         }
     }
 }
 
 impl PathCache {
-    fn generate_path(mut start_pos: IVec2, mut end_pos: IVec2, country_positions: [IVec2; 2], path_finding_lod: ChunkLod, generation_options: &GenerationOptions) -> Path {
+    fn generate_path(
+        mut start_pos: IVec2,
+        mut end_pos: IVec2,
+        country_positions: [IVec2; 2],
+        path_finding_lod: ChunkLod,
+        generation_options: &GenerationOptions,
+    ) -> Path {
         start_pos /= path_finding_lod.multiplier_i32();
         end_pos /= path_finding_lod.multiplier_i32();
 
         let terrain_noise = get_terrain_noise(path_finding_lod, generation_options);
 
         let get_terrain_height = |pos: IVec2| -> f64 {
-            terrain_noise.get((pos * path_finding_lod.multiplier_i32()).as_dvec2().to_array()) * path_finding_lod.multiplier_i32() as f64
+            terrain_noise.get(
+                (pos * path_finding_lod.multiplier_i32())
+                    .as_dvec2()
+                    .to_array(),
+            ) * path_finding_lod.multiplier_i32() as f64
         };
 
         let distance_to_end = |pos: IVec2| -> i32 {
@@ -279,8 +326,14 @@ impl PathCache {
 
         let is_outside_of_countries = |pos: IVec2| -> bool {
             let pos = pos * path_finding_lod.multiplier_i32();
-            let is_outside_first_country = pos.x < country_positions[0].x * COUNTRY_SIZE as i32 || pos.x >= (country_positions[0] + IVec2::X).x * COUNTRY_SIZE as i32 || pos.y < country_positions[0].y * COUNTRY_SIZE as i32 || pos.y >= (country_positions[0] + IVec2::Y).y * COUNTRY_SIZE as i32;
-            let is_outside_second_country = pos.x < country_positions[1].x * COUNTRY_SIZE as i32 || pos.x >= (country_positions[1] + IVec2::X).x * COUNTRY_SIZE as i32 || pos.y < country_positions[1].y * COUNTRY_SIZE as i32 || pos.y >= (country_positions[1] + IVec2::Y).y * COUNTRY_SIZE as i32;
+            let is_outside_first_country = pos.x < country_positions[0].x * COUNTRY_SIZE as i32
+                || pos.x >= (country_positions[0] + IVec2::X).x * COUNTRY_SIZE as i32
+                || pos.y < country_positions[0].y * COUNTRY_SIZE as i32
+                || pos.y >= (country_positions[0] + IVec2::Y).y * COUNTRY_SIZE as i32;
+            let is_outside_second_country = pos.x < country_positions[1].x * COUNTRY_SIZE as i32
+                || pos.x >= (country_positions[1] + IVec2::X).x * COUNTRY_SIZE as i32
+                || pos.y < country_positions[1].y * COUNTRY_SIZE as i32
+                || pos.y >= (country_positions[1] + IVec2::Y).y * COUNTRY_SIZE as i32;
             is_outside_first_country && is_outside_second_country
         };
 
@@ -299,11 +352,12 @@ impl PathCache {
         info!("start_pos: {start_pos}, end_pos: {end_pos}");
 
         while let Some(AStarCandidate {
-                           estimated_weight: _,
-                           real_weight,
-                           state: current,
-                           direction: current_direction,
-                       }) = queue.pop() {
+            estimated_weight: _,
+            real_weight,
+            state: current,
+            direction: current_direction,
+        }) = queue.pop()
+        {
             if current == end_pos {
                 break;
             }
@@ -321,12 +375,13 @@ impl PathCache {
 
                 let next_height = get_terrain_height(next);
 
-                let height_difference = (current_height - next_height).abs() / path_finding_lod.multiplier_i32() as f64;
+                let height_difference =
+                    (current_height - next_height).abs() / path_finding_lod.multiplier_i32() as f64;
                 if height_difference > 0.55 || direction_cost > 1 {
                     continue;
                 }
 
-                let real_weight = real_weight + weight + (height_difference * 20.) as i32;//((total_steepness * 0.6).max(0.) * 10.0) as i32;
+                let real_weight = real_weight + weight + (height_difference * 20.) as i32; //((total_steepness * 0.6).max(0.) * 10.0) as i32;
                 if weights
                     .get(&next)
                     .map(|&weight| real_weight < weight)
@@ -338,7 +393,7 @@ impl PathCache {
                         estimated_weight,
                         real_weight,
                         state: next,
-                        direction
+                        direction,
                     });
                     previous.insert(next, current);
                 }
@@ -369,8 +424,6 @@ impl PathCache {
                 points.push((current - (*parent - current)) * path_finding_lod.multiplier_i32());
             }
 
-
-
             while current != start_pos {
                 let prev = previous
                     .get(&current)
@@ -379,7 +432,8 @@ impl PathCache {
 
                 let dir = prev - current;
 
-                let next = current * path_finding_lod.multiplier_i32() + (dir * path_finding_lod.multiplier_i32()) / 2;
+                let next = current * path_finding_lod.multiplier_i32()
+                    + (dir * path_finding_lod.multiplier_i32()) / 2;
 
                 points.push(next);
 
@@ -413,7 +467,12 @@ impl PathCache {
                 points.push(last - (points[points.len() - 2] - last));
 
                 for i in 1..points.len() - 2 {
-                    path.push(PathLine::new(points[i], points[i + 1], points[i - 1], points[i + 2]));
+                    path.push(PathLine::new(
+                        points[i],
+                        points[i + 1],
+                        points[i - 1],
+                        points[i + 2],
+                    ));
                 }
             }
 

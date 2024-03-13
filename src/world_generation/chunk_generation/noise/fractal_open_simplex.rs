@@ -3,7 +3,10 @@ use noise::permutationtable::PermutationTable;
 use noise::{NoiseFn, Seedable};
 
 #[derive(Clone, Copy, Debug)]
-pub struct FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
+pub struct FractalOpenSimplex<R>
+where
+    R: NoiseFn<f64, 2usize>,
+{
     seed: u32,
     frequency: f64,
     amplitude: f64,
@@ -14,10 +17,21 @@ pub struct FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     roughness: R,
 }
 
-impl<R> FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
+impl<R> FractalOpenSimplex<R>
+where
+    R: NoiseFn<f64, 2usize>,
+{
     pub const DEFAULT_SEED: u32 = 0;
 
-    pub fn new(seed: u32, frequency: f64, amplitude: f64, octaves: i32, lacunarity: f64, persistence: f64, roughness: R) -> Self {
+    pub fn new(
+        seed: u32,
+        frequency: f64,
+        amplitude: f64,
+        octaves: i32,
+        lacunarity: f64,
+        persistence: f64,
+        roughness: R,
+    ) -> Self {
         Self {
             seed,
             frequency,
@@ -31,7 +45,10 @@ impl<R> FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     }
 }
 
-impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
+impl<R> Seedable for FractalOpenSimplex<R>
+where
+    R: NoiseFn<f64, 2usize>,
+{
     fn set_seed(self, seed: u32) -> Self {
         if self.seed == seed {
             return self;
@@ -45,7 +62,7 @@ impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
             lacunarity: self.lacunarity,
             persistence: self.persistence,
             permutation_table: self.permutation_table,
-            roughness: self.roughness
+            roughness: self.roughness,
         }
     }
 
@@ -54,18 +71,46 @@ impl<R> Seedable for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
     }
 }
 
-impl<R> NoiseFn<f64, 2usize> for FractalOpenSimplex<R> where R: NoiseFn<f64, 2usize> {
+impl<R> NoiseFn<f64, 2usize> for FractalOpenSimplex<R>
+where
+    R: NoiseFn<f64, 2usize>,
+{
     fn get(&self, point: [f64; 2]) -> f64 {
         let roughness = self.roughness.get(point);
-        fractal_noise(point[0], point[1], self.frequency, self.amplitude, self.octaves, self.lacunarity, self.persistence + roughness, &self.permutation_table).max(2.)
+        fractal_noise(
+            point[0],
+            point[1],
+            self.frequency,
+            self.amplitude,
+            self.octaves,
+            self.lacunarity,
+            self.persistence + roughness,
+            &self.permutation_table,
+        )
+        .max(2.)
     }
 }
 
-pub fn fractal_noise(x: f64, z: f64, frequency: f64, amplitude: f64, octaves: i32, lacunarity: f64, persistence: f64, hasher: &PermutationTable) -> f64 {
+pub fn fractal_noise(
+    x: f64,
+    z: f64,
+    frequency: f64,
+    amplitude: f64,
+    octaves: i32,
+    lacunarity: f64,
+    persistence: f64,
+    hasher: &PermutationTable,
+) -> f64 {
     let mut noise_value: f64 = 0.;
 
     for octave in 0..octaves {
-        noise_value += noise(x, z, frequency * lacunarity.powi(octave), amplitude * persistence.powi(octave), hasher)
+        noise_value += noise(
+            x,
+            z,
+            frequency * lacunarity.powi(octave),
+            amplitude * persistence.powi(octave),
+            hasher,
+        )
     }
 
     noise_value

@@ -1,19 +1,18 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use crate::player::PlayerSpawnCallback;
+use crate::world_generation::generation_options::GenerationOptionsResource;
 use bevy::app::App;
-use bevy::prelude::{Commands, info, Plugin, Res, ResMut, Resource, Update, With, World};
+use bevy::prelude::{info, Commands, Plugin, Res, ResMut, Resource, Update, With, World};
 use bevy::window::PrimaryWindow;
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts};
 use bevy_inspector_egui::egui;
-use crate::player::PlayerSpawnCallback;
-use crate::world_generation::generation_options::GenerationOptionsResource;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 #[derive(Default)]
 pub struct MainMenuPlugin {}
 
 impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .insert_resource(MainMenuState::default())
+        app.insert_resource(MainMenuState::default())
             .add_systems(Update, spawn_main_menu);
     }
 }
@@ -35,14 +34,14 @@ impl Default for MainMenuState {
 
 enum MainMenuStates {
     Shown,
-    Hidden
+    Hidden,
 }
 
 impl MainMenuState {
     fn show_menu(&self) -> bool {
         match self.state {
-            MainMenuStates::Shown => {true}
-            MainMenuStates::Hidden => {false}
+            MainMenuStates::Shown => true,
+            MainMenuStates::Hidden => false,
         }
     }
 }

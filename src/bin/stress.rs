@@ -1,8 +1,8 @@
-use std::time::Instant;
 use spellhaven::generation_options::{GenerationOptions, GenerationOptionsResource};
 use spellhaven::mesh_generation::generate_mesh;
 use spellhaven::voxel_generation::generate_voxels;
 use spellhaven::voxel_world::ChunkLod;
+use std::time::Instant;
 
 fn main() {
     let data = GenerationOptionsResource::default().0;

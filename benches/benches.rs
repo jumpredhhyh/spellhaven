@@ -1,8 +1,8 @@
-use std::time::Duration;
-use brunch::{Bench, benches};
+use brunch::{benches, Bench};
 use spellhaven::generation_options::{GenerationOptions, GenerationOptionsResource};
 use spellhaven::mesh_generation::generate_mesh;
 use spellhaven::voxel_generation::generate_voxels;
+use std::time::Duration;
 
 fn main() {
     let arc = GenerationOptionsResource::default().0;

@@ -1,4 +1,8 @@
-use std::f32::consts::PI;
+use crate::debug_tools::debug_resource::SpellhavenDebug;
+use crate::player;
+use crate::ui::ui::UiSpawnCallback;
+use crate::world_generation::chunk_generation::VOXEL_SIZE;
+use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
 use bevy::core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin};
 use bevy::ecs::system::SystemId;
 use bevy::pbr::ScreenSpaceAmbientOcclusionBundle;
@@ -7,12 +11,11 @@ use bevy::render::camera::Exposure;
 use bevy::transform;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
-use bevy_rapier3d::prelude::{CharacterAutostep, CharacterLength, Collider, KinematicCharacterController, KinematicCharacterControllerOutput, RigidBody};
-use crate::debug_tools::debug_resource::SpellhavenDebug;
-use crate::player;
-use crate::ui::ui::UiSpawnCallback;
-use crate::world_generation::chunk_generation::VOXEL_SIZE;
-use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
+use bevy_rapier3d::prelude::{
+    CharacterAutostep, CharacterLength, Collider, KinematicCharacterController,
+    KinematicCharacterControllerOutput, RigidBody,
+};
+use std::f32::consts::PI;
 
 pub const STEP_HEIGHT: f32 = 1. * VOXEL_SIZE;
 
@@ -20,8 +23,7 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_plugins(TemporalAntiAliasPlugin)
+        app.add_plugins(TemporalAntiAliasPlugin)
             .insert_resource(Msaa::Off)
             .add_systems(Startup, register_spawn_player_system)
             .add_systems(Update, (movement, move_camera, move_body));
@@ -29,10 +31,10 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component)]
-pub struct Player{
+pub struct Player {
     velocity: Vec3,
     jumped: bool,
-    fly: bool
+    fly: bool,
 }
 
 #[derive(Component)]
@@ -78,68 +80,73 @@ fn spawn_player(
             autostep: Some(CharacterAutostep {
                 min_width: CharacterLength::Absolute(0.01),
                 max_height: CharacterLength::Absolute(VOXEL_SIZE + 0.1),
-                include_dynamic_bodies: true
+                include_dynamic_bodies: true,
             }),
             ..default()
         },
-        Player{velocity: Vec3::ZERO, jumped: false, fly: true},
+        Player {
+            velocity: Vec3::ZERO,
+            jumped: false,
+            fly: true,
+        },
         ChunkLoader::default(),
-        Name::new("Player")
+        Name::new("Player"),
     ));
 
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-            projection: Projection::Perspective(PerspectiveProjection {
-                far: 2f32.powi(20),
-                ..default()
-            }),
-            exposure: Exposure{ev100: 10f32},
-            ..default()
-        },
-        PanOrbitCamera::default(),
-        AtmosphereCamera::default(),
-        PlayerCamera,
-        Name::new("PlayerCamera"),
-        ScreenSpaceAmbientOcclusionBundle::default(),
-    )).insert(TemporalAntiAliasBundle::default());
-
-    commands.spawn((
-        PbrBundle::default(),
-        PlayerBody,
-        Name::new("PlayerBody")
-    )).with_children(|commands| {
-        commands.spawn((
-            SceneBundle {
-                scene: asset_server.load("player.gltf#Scene0"),
-                transform: Transform::from_xyz(0., 0.15, 0.),
-                ..default()
-            },
-            Name::new("PlayerHead")
-        ));
-        commands.spawn((
-            PbrBundle {
-                mesh: meshes.add(Mesh::from(Capsule3d {
-                    radius: 0.4,
-                    half_length: 0.3,
+    commands
+        .spawn((
+            Camera3dBundle {
+                transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+                projection: Projection::Perspective(PerspectiveProjection {
+                    far: 2f32.powi(20),
                     ..default()
-                })),
-                transform: Transform::from_xyz(0., -0.35, 0.),
-                material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
+                }),
+                exposure: Exposure { ev100: 10f32 },
                 ..default()
             },
-            Name::new("PlayerTorso")
-        ));
-    });
+            PanOrbitCamera::default(),
+            AtmosphereCamera::default(),
+            PlayerCamera,
+            Name::new("PlayerCamera"),
+            ScreenSpaceAmbientOcclusionBundle::default(),
+        ))
+        .insert(TemporalAntiAliasBundle::default());
+
+    commands
+        .spawn((PbrBundle::default(), PlayerBody, Name::new("PlayerBody")))
+        .with_children(|commands| {
+            commands.spawn((
+                SceneBundle {
+                    scene: asset_server.load("player.gltf#Scene0"),
+                    transform: Transform::from_xyz(0., 0.15, 0.),
+                    ..default()
+                },
+                Name::new("PlayerHead"),
+            ));
+            commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(Capsule3d {
+                        radius: 0.4,
+                        half_length: 0.3,
+                        ..default()
+                    })),
+                    transform: Transform::from_xyz(0., -0.35, 0.),
+                    material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
+                    ..default()
+                },
+                Name::new("PlayerTorso"),
+            ));
+        });
 
     commands.run_system(ui_spawn_callback.0);
 }
 
 fn move_body(
     player: Query<&Transform, (With<Player>, Without<PlayerBody>)>,
-    mut player_body: Query<&mut Transform, (With<PlayerBody>, Without<Player>)>
+    mut player_body: Query<&mut Transform, (With<PlayerBody>, Without<Player>)>,
 ) {
-    let (Ok(player), Ok(mut player_body)) = (player.get_single(), player_body.get_single_mut()) else {
+    let (Ok(player), Ok(mut player_body)) = (player.get_single(), player_body.get_single_mut())
+    else {
         return;
     };
 
@@ -169,8 +176,13 @@ fn move_camera(
 fn movement(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut players: Query<(&mut KinematicCharacterController, &mut Player, Option<&KinematicCharacterControllerOutput>, &mut Transform)>,
-    player_camera: Query<&PanOrbitCamera, With<PlayerCamera>>
+    mut players: Query<(
+        &mut KinematicCharacterController,
+        &mut Player,
+        Option<&KinematicCharacterControllerOutput>,
+        &mut Transform,
+    )>,
+    player_camera: Query<&PanOrbitCamera, With<PlayerCamera>>,
 ) {
     for (mut controller, mut player, controller_output, mut transform) in &mut players {
         if keyboard_input.just_pressed(KeyCode::KeyF) {
@@ -212,7 +224,11 @@ fn movement(
             }
         }
 
-        let mut movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) { 2. } else { 1. };
+        let mut movement_speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+            2.
+        } else {
+            1.
+        };
 
         if player.fly {
             movement_speed *= 50.;
@@ -231,7 +247,11 @@ fn movement(
         move_direction *= time.delta_seconds();
 
         // Jump if space pressed and the player is close enough to the ground
-        if keyboard_input.pressed(KeyCode::Space) && controller_output.is_some() && controller_output.unwrap().grounded && !player.jumped {
+        if keyboard_input.pressed(KeyCode::Space)
+            && controller_output.is_some()
+            && controller_output.unwrap().grounded
+            && !player.jumped
+        {
             move_direction.y = 0.1;
             player.jumped = true;
         }

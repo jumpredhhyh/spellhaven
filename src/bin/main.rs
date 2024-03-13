@@ -1,4 +1,3 @@
-use std::f32::consts::PI;
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
 use bevy::prelude::*;
 use bevy_atmosphere::prelude::AtmospherePlugin;
@@ -10,6 +9,7 @@ use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::player::PlayerPlugin;
 use spellhaven::ui::ui::GameUiPlugin;
 use spellhaven::world_generation::chunk_generation::ChunkGenerationPlugin;
+use std::f32::consts::PI;
 
 fn main() {
     App::new()
@@ -36,10 +36,7 @@ fn main() {
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    _asset_server: Res<AssetServer>,
-) {
+fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
     commands.spawn((
         DirectionalLightBundle {
             directional_light: DirectionalLight {
@@ -54,7 +51,7 @@ fn setup(
             },
             ..default()
         },
-        Name::new("Light")
+        Name::new("Light"),
     ));
 
     commands.insert_resource(AmbientLight {

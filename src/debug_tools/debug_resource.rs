@@ -1,13 +1,12 @@
 use bevy::app::App;
-use bevy::prelude::{Plugin, Reflect, Resource, ReflectResource};
+use bevy::prelude::{Plugin, Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 
 pub struct SpellhavenDebugPlugin;
 
 impl Plugin for SpellhavenDebugPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_resource::<SpellhavenDebug>()
+        app.init_resource::<SpellhavenDebug>()
             .register_type::<SpellhavenDebug>()
             .add_plugins(ResourceInspectorPlugin::<SpellhavenDebug>::default());
     }

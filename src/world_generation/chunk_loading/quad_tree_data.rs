@@ -1,11 +1,18 @@
-use std::sync::{Arc, Mutex};
-use bevy::prelude::{Commands, Entity};
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode::Node;
+use bevy::prelude::{Commands, Entity};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
 pub enum QuadTreeNode<T> {
     Data(T, Vec<Entity>),
-    Node(Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Box<QuadTreeNode<T>>, Arc<Mutex<i32>>, Vec<Entity>)
+    Node(
+        Box<QuadTreeNode<T>>,
+        Box<QuadTreeNode<T>>,
+        Box<QuadTreeNode<T>>,
+        Box<QuadTreeNode<T>>,
+        Arc<Mutex<i32>>,
+        Vec<Entity>,
+    ),
 }
 
 pub enum QuadTreeDistinction {
@@ -27,9 +34,12 @@ impl Into<i32> for QuadTreeDistinction {
 }
 
 impl<T> QuadTreeNode<T> {
-    pub fn run_on_data<F>(&self, closure: F) where F: Fn(&T) {
+    pub fn run_on_data<F>(&self, closure: F)
+    where
+        F: Fn(&T),
+    {
         match self {
-            QuadTreeNode::Data(data, _) => {closure(data)}
+            QuadTreeNode::Data(data, _) => closure(data),
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 a.run_on_data(&closure);
                 b.run_on_data(&closure);
@@ -41,7 +51,9 @@ impl<T> QuadTreeNode<T> {
 
     pub fn add_to_parent(&mut self, depth: i32, position: [i32; 2], commands: &mut Commands) {
         let mut further = false;
-        if let Some(Node(_, _, _, _, child_progress, entities)) = self.get_parent_node(depth, position) {
+        if let Some(Node(_, _, _, _, child_progress, entities)) =
+            self.get_parent_node(depth, position)
+        {
             let mut child_progress_lock = child_progress.lock().unwrap();
             *child_progress_lock += 1;
 
@@ -69,7 +81,7 @@ impl<T> QuadTreeNode<T> {
         }
 
         return match self {
-            QuadTreeNode::Data(_, _) => { None }
+            QuadTreeNode::Data(_, _) => None,
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 let divider = 2_i32.pow(depth as u32 - 1);
 
@@ -85,9 +97,9 @@ impl<T> QuadTreeNode<T> {
                     } else {
                         d.get_parent_node(depth - 1, [position[0] - divider, position[1] - divider])
                     }
-                }
+                };
             }
-        }
+        };
     }
 
     pub fn get_node(&mut self, depth: i32, position: [i32; 2]) -> Option<&mut Self> {
@@ -96,7 +108,7 @@ impl<T> QuadTreeNode<T> {
         }
 
         return match self {
-            QuadTreeNode::Data(_, _) => {None}
+            QuadTreeNode::Data(_, _) => None,
             QuadTreeNode::Node(a, b, c, d, _, _) => {
                 let divider = 2_i32.pow(depth as u32 - 1);
 
@@ -112,8 +124,8 @@ impl<T> QuadTreeNode<T> {
                     } else {
                         d.get_node(depth - 1, [position[0] - divider, position[1] - divider])
                     }
-                }
+                };
             }
-        }
+        };
     }
 }

@@ -1,6 +1,6 @@
+use crate::world_generation::chunk_generation::noise::fractal_open_simplex::noise;
 use noise::permutationtable::PermutationTable;
 use noise::{NoiseFn, Seedable};
-use crate::world_generation::chunk_generation::noise::fractal_open_simplex::noise;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Roughness {
@@ -44,6 +44,12 @@ impl Seedable for Roughness {
 
 impl NoiseFn<f64, 2usize> for Roughness {
     fn get(&self, point: [f64; 2]) -> f64 {
-        noise(point[0], point[1], self.frequency, self.amplitude, &self.permutation_table) - 0.15
+        noise(
+            point[0],
+            point[1],
+            self.frequency,
+            self.amplitude,
+            &self.permutation_table,
+        ) - 0.15
     }
 }

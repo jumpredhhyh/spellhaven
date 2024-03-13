@@ -1,11 +1,18 @@
+use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
+use crate::world_generation::voxel_world::ChunkLod;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
 use rand::Rng;
-use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
-use crate::world_generation::voxel_world::ChunkLod;
 
-pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2], i32, bool), chunk_lod: ChunkLod) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
+pub fn generate_mesh(
+    generation_result: (
+        [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2],
+        i32,
+        bool,
+    ),
+    chunk_lod: ChunkLod,
+) -> (Option<(Mesh, Vec<Vec3>, Vec<[u32; 3]>)>, bool) {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all());
 
     let mut positions: Vec<[f32; 3]> = Vec::new();
@@ -36,10 +43,26 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x - 1][y + 1][z] != BlockType::Air, blocks[x][y + 1][z - 1] != BlockType::Air, blocks[x - 1][y + 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y + 1][z] != BlockType::Air, blocks[x][y + 1][z - 1] != BlockType::Air, blocks[x + 1][y + 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y + 1][z] != BlockType::Air, blocks[x][y + 1][z + 1] != BlockType::Air, blocks[x + 1][y + 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y + 1][z] != BlockType::Air, blocks[x][y + 1][z + 1] != BlockType::Air, blocks[x - 1][y + 1][z + 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y + 1][z] != BlockType::Air,
+                            blocks[x][y + 1][z - 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y + 1][z] != BlockType::Air,
+                            blocks[x][y + 1][z - 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y + 1][z] != BlockType::Air,
+                            blocks[x][y + 1][z + 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y + 1][z] != BlockType::Air,
+                            blocks[x][y + 1][z + 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z + 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -50,35 +73,54 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5]
+                        [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
-                       [0., 1., 0.],
-                       [0., 1., 0.],
-                       [0., 1., 0.],
-                       [0., 1., 0.],
+                        [0., 1., 0.],
+                        [0., 1., 0.],
+                        [0., 1., 0.],
+                        [0., 1., 0.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
+                    triangles.extend_from_slice(&[
+                        [
                             positions_count + 0,
-                            positions_count + (if rotate_quad {2} else {3}),
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
                             positions_count + 1,
-                        ], [
-                            positions_count + (if rotate_quad {0} else {1}),
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
                             positions_count + 3,
-                            positions_count + 2
-                    ]]);
+                            positions_count + 2,
+                        ],
+                    ]);
                 }
 
                 if blocks[x][y - 1][z] == BlockType::Air {
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x - 1][y - 1][z] != BlockType::Air, blocks[x][y - 1][z - 1] != BlockType::Air, blocks[x - 1][y - 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y - 1][z] != BlockType::Air, blocks[x][y - 1][z - 1] != BlockType::Air, blocks[x + 1][y - 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y - 1][z] != BlockType::Air, blocks[x][y - 1][z + 1] != BlockType::Air, blocks[x + 1][y - 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y - 1][z] != BlockType::Air, blocks[x][y - 1][z + 1] != BlockType::Air, blocks[x - 1][y - 1][z + 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y - 1][z] != BlockType::Air,
+                            blocks[x][y - 1][z - 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y - 1][z] != BlockType::Air,
+                            blocks[x][y - 1][z - 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y - 1][z] != BlockType::Air,
+                            blocks[x][y - 1][z + 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y - 1][z] != BlockType::Air,
+                            blocks[x][y - 1][z + 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z + 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -89,7 +131,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5]
+                        [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
@@ -99,25 +141,44 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [0., -1., 0.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
-                        positions_count + 0,
-                        positions_count + 1,
-                        positions_count + (if rotate_quad {2} else {3}),
-                    ], [
-                        positions_count + (if rotate_quad {0} else {1}),
-                        positions_count + 2,
-                        positions_count + 3
-                    ]]);
+                    triangles.extend_from_slice(&[
+                        [
+                            positions_count + 0,
+                            positions_count + 1,
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
+                            positions_count + 2,
+                            positions_count + 3,
+                        ],
+                    ]);
                 }
 
                 if blocks[x + 1][y][z] == BlockType::Air {
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x + 1][y - 1][z] != BlockType::Air, blocks[x + 1][y][z - 1] != BlockType::Air, blocks[x + 1][y - 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y - 1][z] != BlockType::Air, blocks[x + 1][y][z + 1] != BlockType::Air, blocks[x + 1][y - 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y + 1][z] != BlockType::Air, blocks[x + 1][y][z + 1] != BlockType::Air, blocks[x + 1][y + 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y + 1][z] != BlockType::Air, blocks[x + 1][y][z - 1] != BlockType::Air, blocks[x + 1][y + 1][z - 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y - 1][z] != BlockType::Air,
+                            blocks[x + 1][y][z - 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y - 1][z] != BlockType::Air,
+                            blocks[x + 1][y][z + 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y + 1][z] != BlockType::Air,
+                            blocks[x + 1][y][z + 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y + 1][z] != BlockType::Air,
+                            blocks[x + 1][y][z - 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z - 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -128,7 +189,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
                         [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5]
+                        [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
@@ -138,25 +199,44 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [1., 0., 0.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
-                        positions_count + 0,
-                        positions_count + (if rotate_quad {2} else {3}),
-                        positions_count + 1,
-                    ], [
-                        positions_count + (if rotate_quad {0} else {1}),
-                        positions_count + 3,
-                        positions_count + 2
-                    ]]);
+                    triangles.extend_from_slice(&[
+                        [
+                            positions_count + 0,
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                            positions_count + 1,
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
+                            positions_count + 3,
+                            positions_count + 2,
+                        ],
+                    ]);
                 }
 
                 if blocks[x - 1][y][z] == BlockType::Air {
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x - 1][y - 1][z] != BlockType::Air, blocks[x - 1][y][z - 1] != BlockType::Air, blocks[x - 1][y - 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y - 1][z] != BlockType::Air, blocks[x - 1][y][z + 1] != BlockType::Air, blocks[x - 1][y - 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y + 1][z] != BlockType::Air, blocks[x - 1][y][z + 1] != BlockType::Air, blocks[x - 1][y + 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y + 1][z] != BlockType::Air, blocks[x - 1][y][z - 1] != BlockType::Air, blocks[x - 1][y + 1][z - 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y - 1][z] != BlockType::Air,
+                            blocks[x - 1][y][z - 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y - 1][z] != BlockType::Air,
+                            blocks[x - 1][y][z + 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y + 1][z] != BlockType::Air,
+                            blocks[x - 1][y][z + 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y + 1][z] != BlockType::Air,
+                            blocks[x - 1][y][z - 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z - 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -167,7 +247,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
                         [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5]
+                        [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
@@ -177,25 +257,44 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [-1., 0., 0.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
-                        positions_count + 0,
-                        positions_count + 1,
-                        positions_count + (if rotate_quad {2} else {3}),
-                    ], [
-                        positions_count + (if rotate_quad {0} else {1}),
-                        positions_count + 2,
-                        positions_count + 3
-                    ]]);
+                    triangles.extend_from_slice(&[
+                        [
+                            positions_count + 0,
+                            positions_count + 1,
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
+                            positions_count + 2,
+                            positions_count + 3,
+                        ],
+                    ]);
                 }
 
                 if blocks[x][y][z + 1] == BlockType::Air {
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x - 1][y][z + 1] != BlockType::Air, blocks[x][y - 1][z + 1] != BlockType::Air, blocks[x - 1][y - 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y][z + 1] != BlockType::Air, blocks[x][y + 1][z + 1] != BlockType::Air, blocks[x - 1][y + 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y][z + 1] != BlockType::Air, blocks[x][y + 1][z + 1] != BlockType::Air, blocks[x + 1][y + 1][z + 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y][z + 1] != BlockType::Air, blocks[x][y - 1][z + 1] != BlockType::Air, blocks[x + 1][y - 1][z + 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y][z + 1] != BlockType::Air,
+                            blocks[x][y - 1][z + 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y][z + 1] != BlockType::Air,
+                            blocks[x][y + 1][z + 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y][z + 1] != BlockType::Air,
+                            blocks[x][y + 1][z + 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z + 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y][z + 1] != BlockType::Air,
+                            blocks[x][y - 1][z + 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z + 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -206,7 +305,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
                         [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
                         [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5]
+                        [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
@@ -216,25 +315,44 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [0., 0., 1.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
-                        positions_count + 0,
-                        positions_count + (if rotate_quad {2} else {3}),
-                        positions_count + 1,
-                    ], [
-                        positions_count + (if rotate_quad {0} else {1}),
-                        positions_count + 3,
-                        positions_count + 2
-                    ]]);
+                    triangles.extend_from_slice(&[
+                        [
+                            positions_count + 0,
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                            positions_count + 1,
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
+                            positions_count + 3,
+                            positions_count + 2,
+                        ],
+                    ]);
                 }
 
                 if blocks[x][y][z - 1] == BlockType::Air {
                     let positions_count = positions.len() as u32;
 
                     let aos = [
-                        calculate_ambient_occlusion(blocks[x - 1][y][z - 1] != BlockType::Air, blocks[x][y - 1][z - 1] != BlockType::Air, blocks[x - 1][y - 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x - 1][y][z - 1] != BlockType::Air, blocks[x][y + 1][z - 1] != BlockType::Air, blocks[x - 1][y + 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y][z - 1] != BlockType::Air, blocks[x][y + 1][z - 1] != BlockType::Air, blocks[x + 1][y + 1][z - 1] != BlockType::Air),
-                        calculate_ambient_occlusion(blocks[x + 1][y][z - 1] != BlockType::Air, blocks[x][y - 1][z - 1] != BlockType::Air, blocks[x + 1][y - 1][z - 1] != BlockType::Air),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y][z - 1] != BlockType::Air,
+                            blocks[x][y - 1][z - 1] != BlockType::Air,
+                            blocks[x - 1][y - 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x - 1][y][z - 1] != BlockType::Air,
+                            blocks[x][y + 1][z - 1] != BlockType::Air,
+                            blocks[x - 1][y + 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y][z - 1] != BlockType::Air,
+                            blocks[x][y + 1][z - 1] != BlockType::Air,
+                            blocks[x + 1][y + 1][z - 1] != BlockType::Air,
+                        ),
+                        calculate_ambient_occlusion(
+                            blocks[x + 1][y][z - 1] != BlockType::Air,
+                            blocks[x][y - 1][z - 1] != BlockType::Air,
+                            blocks[x + 1][y - 1][z - 1] != BlockType::Air,
+                        ),
                     ];
 
                     add_colors(&mut colors, color, &aos);
@@ -245,7 +363,7 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
                         [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
                         [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5]
+                        [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
                     ]);
 
                     normals.extend_from_slice(&[
@@ -255,15 +373,18 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
                         [0., 0., -1.],
                     ]);
 
-                    triangles.extend_from_slice(&[[
-                        positions_count + 0,
-                        positions_count + 1,
-                        positions_count + (if rotate_quad {2} else {3}),
-                    ], [
-                        positions_count + (if rotate_quad {0} else {1}),
-                        positions_count + 2,
-                        positions_count + 3
-                    ]]);
+                    triangles.extend_from_slice(&[
+                        [
+                            positions_count + 0,
+                            positions_count + 1,
+                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                        ],
+                        [
+                            positions_count + (if rotate_quad { 0 } else { 1 }),
+                            positions_count + 2,
+                            positions_count + 3,
+                        ],
+                    ]);
                 }
             }
         }
@@ -275,7 +396,8 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
 
     for position in positions.iter_mut() {
         position[0] = (position[0] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
-        position[1] = (position[1] + min_height as f32 - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
+        position[1] =
+            (position[1] + min_height as f32 - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
         position[2] = (position[2] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
     }
 
@@ -288,24 +410,39 @@ pub fn generate_mesh(generation_result: ([[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK
     }
 
     let collider_positions = if chunk_lod == ChunkLod::Full {
-        positions.clone().iter().map(|position| Vec3::new(position[0], position[1], position[2])).collect()
+        positions
+            .clone()
+            .iter()
+            .map(|position| Vec3::new(position[0], position[1], position[2]))
+            .collect()
     } else {
         Vec::new()
     };
 
-    mesh.insert_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        positions
-    );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(mesh_triangles));
 
-    (Some((mesh, collider_positions, if chunk_lod == ChunkLod::Full { triangles } else { Vec::new() })), generate_more)
+    (
+        Some((
+            mesh,
+            collider_positions,
+            if chunk_lod == ChunkLod::Full {
+                triangles
+            } else {
+                Vec::new()
+            },
+        )),
+        generate_more,
+    )
 }
 
-fn all_neighbours(pos: [usize; 3], blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2]) -> bool {
+fn all_neighbours(
+    pos: [usize; 3],
+    blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2],
+) -> bool {
     if blocks[pos[0]][pos[1] + 1][pos[2]] == BlockType::Air {
         return false;
     }
@@ -328,7 +465,7 @@ fn all_neighbours(pos: [usize; 3], blocks: &[[[BlockType; CHUNK_SIZE[2] + 2]; CH
 }
 
 fn calculate_ambient_occlusion(side1: bool, side2: bool, corner: bool) -> f32 {
-    if side1 && side2 { 
+    if side1 && side2 {
         return 0.1;
     }
     if (side1 || side2) && corner {
@@ -340,8 +477,17 @@ fn calculate_ambient_occlusion(side1: bool, side2: bool, corner: bool) -> f32 {
     return 1.;
 }
 
-fn add_colors(colors: &mut Vec<[f32; 4]>, color: [f32; 4], ambient_occlusion_multipliers: &[f32; 4]) {
+fn add_colors(
+    colors: &mut Vec<[f32; 4]>,
+    color: [f32; 4],
+    ambient_occlusion_multipliers: &[f32; 4],
+) {
     for i in 0..4 {
-        colors.push([color[0] * ambient_occlusion_multipliers[i], color[1] * ambient_occlusion_multipliers[i], color[2] * ambient_occlusion_multipliers[i], color[3]]);
+        colors.push([
+            color[0] * ambient_occlusion_multipliers[i],
+            color[1] * ambient_occlusion_multipliers[i],
+            color[2] * ambient_occlusion_multipliers[i],
+            color[3],
+        ]);
     }
 }
