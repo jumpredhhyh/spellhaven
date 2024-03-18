@@ -36,7 +36,3 @@ num-traits = "0.2.16"
 
 [dev-dependencies]
 brunch = "0.5.0"
-
-[[bench]]
-name = "benches"
-harness = false

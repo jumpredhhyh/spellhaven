@@ -7,7 +7,7 @@ use crate::world_generation::chunk_loading::country_cache::{
 };
 use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
-use bevy::math::IVec2;
+use bevy::math::{IVec2, IVec3};
 use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
 use noise::core::worley::distance_functions::{
@@ -21,6 +21,8 @@ use noise::{
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
+
+use super::voxel_types::VoxelData;
 
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
@@ -38,12 +40,8 @@ pub fn generate_voxels(
     generation_options: &GenerationOptions,
     chunk_lod: ChunkLod,
     country_cache: &CountryCache,
-) -> (
-    [[[BlockType; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2],
-    i32,
-    bool,
-) {
-    let mut blocks = [[[BlockType::Air; CHUNK_SIZE[2] + 2]; CHUNK_SIZE[1] + 2]; CHUNK_SIZE[0] + 2];
+) -> (VoxelData, i32, bool) {
+    let mut blocks = VoxelData::default();
     //let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12));
 
     let terrain_noise = get_terrain_noise(chunk_lod, generation_options);
@@ -133,19 +131,24 @@ pub fn generate_voxels(
                 if y == CHUNK_SIZE[1] + 1 + min_height as usize {
                     generate_more = true;
                 }
-                blocks[x][y - min_height as usize][z] = if is_path {
-                    BlockType::Path
-                } else {
-                    if is_grass_steep && y + 1 == noise_height.floor() as usize {
-                        if is_snow {
-                            BlockType::Snow
-                        } else {
-                            BlockType::Grass
-                        }
+                blocks.set_block(
+                    x,
+                    y - min_height as usize,
+                    z,
+                    if is_path {
+                        BlockType::Path
                     } else {
-                        BlockType::Stone
-                    }
-                };
+                        if is_grass_steep && y + 1 == noise_height.floor() as usize {
+                            if is_snow {
+                                BlockType::Snow
+                            } else {
+                                BlockType::Grass
+                            }
+                        } else {
+                            BlockType::Stone
+                        }
+                    },
+                );
             }
 
             for structure in &generation_options.structures {
@@ -168,18 +171,23 @@ pub fn generate_voxels(
                         - min_height.min(noise_height as i32))
                     .max(1) as usize
                         - 1;
-                    let current_color = match blocks[x][top_terrain][z] {
+                    let current_color = match blocks.get_block(x, top_terrain, z) {
                         BlockType::StructureDebug(r, g, b) => (r, g, b),
                         _ => (0u8, 0u8, 0u8),
                     };
-                    blocks[x][top_terrain][z] = BlockType::StructureDebug(
-                        ((structure_value) * structure.debug_rgb_multiplier[0] * 255.) as u8
-                            + current_color.0,
-                        ((structure_value) * structure.debug_rgb_multiplier[1] * 255.) as u8
-                            + current_color.1,
-                        ((structure_value) * structure.debug_rgb_multiplier[2] * 255.) as u8
-                            + current_color.2,
-                    )
+                    blocks.set_block(
+                        x,
+                        top_terrain,
+                        z,
+                        BlockType::StructureDebug(
+                            ((structure_value) * structure.debug_rgb_multiplier[0] * 255.) as u8
+                                + current_color.0,
+                            ((structure_value) * structure.debug_rgb_multiplier[1] * 255.) as u8
+                                + current_color.1,
+                            ((structure_value) * structure.debug_rgb_multiplier[2] * 255.) as u8
+                                + current_color.2,
+                        ),
+                    );
                 }
                 let mut rand = StdRng::seed_from_u64((structure_value.abs() * 10000.) as u64);
 
@@ -268,8 +276,12 @@ pub fn generate_voxels(
                             generate_more = true;
                             break;
                         }
-                        blocks[x][noise_height as usize + chunk_index - min_height as usize][z] =
-                            structure_block;
+                        blocks.set_block(
+                            x,
+                            noise_height as usize + chunk_index - min_height as usize,
+                            z,
+                            structure_block,
+                        );
                     }
                 }
             }
@@ -361,7 +373,7 @@ pub fn get_terrain_noise(
                                             Turbulence::<Worley, Perlin>::new(
                                                 Worley::new(rng.gen())
                                                     .set_frequency(0.5f64.powi(13))
-                                                    .set_distance_function(&euclidean)
+                                                    .set_distance_function(&euclidean_squared)
                                                     .set_return_type(ReturnType::Distance),
                                             )
                                             .set_frequency(0.5f64.powi(10))
@@ -417,8 +429,8 @@ pub fn get_steepness_map<const SIZE: usize, const SIZE2: usize>(
 ) {
     for x in 0..SIZE {
         for z in 0..SIZE {
-            let steepness_x = ((noise_map[x][z] - noise_map[x + 2][z]) / 2.).abs();
-            let steepness_z = ((noise_map[x][z] - noise_map[x][z + 2]) / 2.).abs();
+            let steepness_x = ((noise_map[x][z + 1] - noise_map[x + 2][z + 1]) / 2.).abs();
+            let steepness_z = ((noise_map[x + 1][z] - noise_map[x + 1][z + 2]) / 2.).abs();
             array[x][z] = (steepness_x + steepness_z) / 2.;
         }
     }

@@ -1,5 +1,6 @@
 use crate::debug_tools::debug_resource::SpellhavenDebug;
 use crate::player::Player;
+use crate::terrain_material::TerrainMaterial;
 use crate::utils::div_floor;
 use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
 use crate::world_generation::chunk_loading::chunk_loader::{
@@ -15,6 +16,7 @@ use crate::world_generation::voxel_world::{
     ChunkGenerationResult, ChunkLod, QuadTreeVoxelWorld, VoxelWorld, MAX_LOD,
 };
 use ::noise::NoiseFn;
+use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
 use bevy_rapier3d::prelude::{Collider, RigidBody};
@@ -25,6 +27,7 @@ use std::sync::{Arc, Mutex};
 pub mod mesh_generation;
 mod noise;
 pub mod voxel_generation;
+pub mod voxel_types;
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
 pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
@@ -36,7 +39,7 @@ pub struct ChunkTaskData {
     pub collider: Option<Collider>,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum BlockType {
     Air,
     Stone,
@@ -82,6 +85,10 @@ impl Resource for ChunkTaskPool {}
 pub struct CacheTaskPool(pub TaskPool);
 impl Resource for CacheTaskPool {}
 
+#[derive(Resource, Reflect, Default)]
+#[reflect(Resource)]
+pub struct ChunkTriangles(pub [u64; MAX_LOD.usize()]);
+
 impl Plugin for ChunkGenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(ChunkLoaderPlugin)
@@ -114,7 +121,9 @@ impl Plugin for ChunkGenerationPlugin {
                     .stack_size(3_000_000)
                     .build(),
             ))
-            .insert_resource(GenerationOptionsResource::default());
+            .insert_resource(GenerationOptionsResource::default())
+            .insert_resource(ChunkTriangles([0; MAX_LOD.usize()]))
+            .register_type::<ChunkTriangles>();
     }
 }
 
@@ -612,14 +621,15 @@ fn set_generated_chunks(
     mut commands: Commands,
     mut chunks: Query<(Entity, &mut ChunkGenerationTask)>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
     mut voxel_world: ResMut<QuadTreeVoxelWorld>,
+    mut chunk_triangles: ResMut<ChunkTriangles>,
 ) {
     for (entity, mut task) in &mut chunks {
-        if let Some(chunk_task_data_option) = future::block_on(future::poll_once(&mut task.0)) {
+        if let Some(chunk_generation_result) = future::block_on(future::poll_once(&mut task.0)) {
             let tree_depth = <ChunkLod as Into<i32>>::into(MAX_LOD)
-                - <ChunkLod as Into<i32>>::into(chunk_task_data_option.lod);
-            match voxel_world.get_chunk(chunk_task_data_option.parent_pos.to_array()) {
+                - <ChunkLod as Into<i32>>::into(chunk_generation_result.lod);
+            match voxel_world.get_chunk(chunk_generation_result.parent_pos.to_array()) {
                 None => {
                     info!("Owner not found!")
                 }
@@ -629,25 +639,27 @@ fn set_generated_chunks(
                     }
                     Some(ref mut tree) => {
                         match tree
-                            .get_node(tree_depth, chunk_task_data_option.lod_position.to_array())
+                            .get_node(tree_depth, chunk_generation_result.lod_position.to_array())
                         {
                             None => {
                                 info!(
                                     "Map not found! depth: {0}, pos: [{1}, {2}]",
                                     <ChunkLod as Into<i32>>::into(MAX_LOD)
-                                        - <ChunkLod as Into<i32>>::into(chunk_task_data_option.lod),
-                                    chunk_task_data_option.lod_position[0],
-                                    chunk_task_data_option.lod_position[1]
+                                        - <ChunkLod as Into<i32>>::into(
+                                            chunk_generation_result.lod
+                                        ),
+                                    chunk_generation_result.lod_position[0],
+                                    chunk_generation_result.lod_position[1]
                                 );
                             }
                             Some(node) => {
-                                if chunk_task_data_option.generate_above {
+                                if chunk_generation_result.generate_above {
                                     if let Data(map, _) = node {
-                                        let new_height = chunk_task_data_option.chunk_height + 1;
+                                        let new_height = chunk_generation_result.chunk_height + 1;
 
                                         let child = commands.spawn((
-                                                ChunkTaskGenerator(chunk_task_data_option.parent_pos, chunk_task_data_option.lod, chunk_task_data_option.lod_position, new_height, task.1),
-                                                Name::new(format!("SubChunk[lod: {0:?}, pos: {1:?}, height: {new_height}]", chunk_task_data_option.lod, chunk_task_data_option.lod_position)),
+                                                ChunkTaskGenerator(chunk_generation_result.parent_pos, chunk_generation_result.lod, chunk_generation_result.lod_position, new_height, task.1),
+                                                Name::new(format!("SubChunk[lod: {0:?}, pos: {1:?}, height: {new_height}]", chunk_generation_result.lod, chunk_generation_result.lod_position)),
                                                 Visibility::Visible
                                             )).id();
 
@@ -670,7 +682,7 @@ fn set_generated_chunks(
 
                                     tree.add_to_parent(
                                         tree_depth,
-                                        chunk_task_data_option.lod_position.to_array(),
+                                        chunk_generation_result.lod_position.to_array(),
                                         &mut commands,
                                     );
                                 }
@@ -681,23 +693,37 @@ fn set_generated_chunks(
             }
 
             if let Some(mut current_entity) = commands.get_entity(entity) {
-                if let Some(chunk_task_data) = chunk_task_data_option.task_data {
+                if let Some(chunk_task_data) = chunk_generation_result.task_data {
+                    let triangle_count = chunk_task_data.mesh.indices().unwrap().len() / 3;
+
+                    chunk_triangles.0[chunk_generation_result.lod.usize() - 1] +=
+                        triangle_count as u64;
+
                     current_entity.remove::<ChunkGenerationTask>().insert((
-                        PbrBundle {
+                        MaterialMeshBundle {
                             mesh: meshes.add(chunk_task_data.mesh),
-                            material: materials.add(Color::WHITE),
+                            material: materials.add(ExtendedMaterial {
+                                base: Color::WHITE.into(),
+                                extension: TerrainMaterial {
+                                    chunk_blocks: chunk_generation_result.voxel_data.array,
+                                    palette: chunk_generation_result.voxel_data.palette,
+                                    chunk_pos: chunk_generation_result.chunk_pos,
+                                    chunk_lod: chunk_generation_result.lod.multiplier_i32(),
+                                    min_chunk_height: chunk_generation_result.min_height,
+                                },
+                            }),
                             transform: chunk_task_data.transform,
                             ..default()
                         },
                         Chunk([
-                            chunk_task_data_option.parent_pos[0],
-                            chunk_task_data_option.chunk_height,
-                            chunk_task_data_option.parent_pos[1],
+                            chunk_generation_result.parent_pos[0],
+                            chunk_generation_result.chunk_height,
+                            chunk_generation_result.parent_pos[1],
                         ]),
                         //SpawnAnimation::default()
                     ));
 
-                    if chunk_task_data_option.lod == ChunkLod::Full {
+                    if chunk_generation_result.lod == ChunkLod::Full {
                         current_entity
                             .insert((RigidBody::Fixed, chunk_task_data.collider.unwrap()));
                     }

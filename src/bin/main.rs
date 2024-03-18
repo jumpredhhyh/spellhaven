@@ -1,5 +1,7 @@
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
+use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
+use bevy::window::PresentMode;
 use bevy_atmosphere::prelude::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
@@ -7,6 +9,7 @@ use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::player::PlayerPlugin;
+use spellhaven::terrain_material::TerrainMaterial;
 use spellhaven::ui::ui::GameUiPlugin;
 use spellhaven::world_generation::chunk_generation::ChunkGenerationPlugin;
 use std::f32::consts::PI;
@@ -14,7 +17,14 @@ use std::f32::consts::PI;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Spellhaven".into(),
+                    present_mode: PresentMode::Immediate,
+                    ..default()
+                }),
+                ..default()
+            }),
             PanOrbitCameraPlugin,
             ChunkGenerationPlugin,
             AtmospherePlugin,
@@ -27,6 +37,7 @@ fn main() {
             WorldInspectorPlugin::new(),
             GameUiPlugin,
             SpellhavenDebugPlugin,
+            MaterialPlugin::<ExtendedMaterial<StandardMaterial, TerrainMaterial>>::default(),
         ))
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {

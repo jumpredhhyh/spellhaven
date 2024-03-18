@@ -1,6 +1,8 @@
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::{Component, Query, Res, Text, With};
 
+use crate::world_generation::chunk_generation::ChunkTriangles;
+
 #[derive(Component)]
 pub struct FpsText;
 
@@ -13,7 +15,34 @@ pub fn update_fps_ui(
             .get(&FrameTimeDiagnosticsPlugin::FPS)
             .and_then(|fps| fps.smoothed())
         {
-            text.sections[0].value = format!("FPS: {:?}", fps.floor());
+            text.sections[0].value = format!("FPS: {:.0}", fps);
         }
+    }
+}
+
+#[derive(Component)]
+pub struct TriangleText;
+
+pub fn update_triangle_ui(
+    mut texts: Query<&mut Text, With<TriangleText>>,
+    triangle_count: Res<ChunkTriangles>,
+) {
+    for mut text in &mut texts {
+        text.sections[0].value = format!(
+            "Triangles: {}, Total: {}",
+            triangle_count
+                .0
+                .map(|x| x
+                    .to_string()
+                    .as_bytes()
+                    .rchunks(3)
+                    .rev()
+                    .map(std::str::from_utf8)
+                    .collect::<Result<Vec<&str>, _>>()
+                    .unwrap()
+                    .join("'"))
+                .join(", "),
+            triangle_count.0.iter().sum::<u64>()
+        );
     }
 }

@@ -1,5 +1,4 @@
 use crate::debug_tools::debug_resource::SpellhavenDebug;
-use crate::player;
 use crate::ui::ui::UiSpawnCallback;
 use crate::world_generation::chunk_generation::VOXEL_SIZE;
 use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
@@ -8,7 +7,6 @@ use bevy::ecs::system::SystemId;
 use bevy::pbr::ScreenSpaceAmbientOcclusionBundle;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
-use bevy::transform;
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{

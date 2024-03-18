@@ -4,10 +4,13 @@ use crate::world_generation::chunk_generation::{ChunkTaskData, CHUNK_SIZE, VOXEL
 use crate::world_generation::chunk_loading::country_cache::CountryCache;
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
 use crate::world_generation::generation_options::GenerationOptions;
+use bevy::math::{IVec3, IVec4, Vec3Swizzles};
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use super::chunk_generation::voxel_types::VoxelData;
 
 pub const MAX_LOD: ChunkLod = ChunkLod::OneTwentyEight;
 
@@ -118,6 +121,9 @@ pub struct ChunkGenerationResult {
     pub lod: ChunkLod,
     pub lod_position: IVec2,
     pub chunk_height: i32,
+    pub voxel_data: VoxelData,
+    pub chunk_pos: IVec3,
+    pub min_height: i32,
 }
 
 impl VoxelWorld for QuadTreeVoxelWorld {
@@ -134,18 +140,18 @@ impl VoxelWorld for QuadTreeVoxelWorld {
             chunk_height,
             parent_pos.y * MAX_LOD.multiplier_i32() + lod_position.y * chunk_lod.multiplier_i32(),
         ];
-        let mesh = generate_mesh(
-            generate_voxels(
-                new_chunk_pos,
-                &generation_options,
-                chunk_lod,
-                &country_cache,
-            ),
+
+        let (mut data, min_height, more) = generate_voxels(
+            new_chunk_pos,
+            &generation_options,
             chunk_lod,
+            &country_cache,
         );
 
+        let mesh = generate_mesh(&data, min_height, chunk_lod);
+
         return ChunkGenerationResult {
-            task_data: match mesh.0 {
+            task_data: match mesh {
                 None => None,
                 Some(mesh) => Some(ChunkTaskData {
                     transform: Transform::from_xyz(
@@ -161,11 +167,14 @@ impl VoxelWorld for QuadTreeVoxelWorld {
                     mesh: mesh.0,
                 }),
             },
-            generate_above: mesh.1,
+            generate_above: more,
             parent_pos,
             lod: chunk_lod,
             lod_position,
             chunk_height,
+            voxel_data: data,
+            chunk_pos: IVec3::from_array(new_chunk_pos),
+            min_height,
         };
     }
 

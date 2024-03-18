@@ -1,4 +1,4 @@
-use crate::ui::fps_text::{update_fps_ui, FpsText};
+use crate::ui::fps_text::*;
 use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::task_text::{update_task_ui, ChunkTaskText, CountryTaskText};
 use bevy::app::App;
@@ -15,7 +15,7 @@ impl Plugin for GameUiPlugin {
             MainMenuPlugin::default(),
         ))
         .add_systems(Startup, register_spawn_ui_system)
-        .add_systems(Update, (update_fps_ui, update_task_ui));
+        .add_systems(Update, (update_fps_ui, update_task_ui, update_triangle_ui));
     }
 }
 
@@ -57,6 +57,25 @@ fn spawn_ui(mut commands: Commands) {
                     ..default()
                 },
                 FpsText,
+            ));
+            commands.spawn((
+                TextBundle {
+                    text: Text::from_section(
+                        "TRIANGLES!",
+                        TextStyle {
+                            font_size: 32.0,
+                            ..default()
+                        },
+                    ),
+                    style: Style {
+                        width: Val::Auto,
+                        height: Val::Px(32.0),
+                        margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
+                        ..default()
+                    },
+                    ..default()
+                },
+                TriangleText,
             ));
             commands.spawn((
                 TextBundle {
