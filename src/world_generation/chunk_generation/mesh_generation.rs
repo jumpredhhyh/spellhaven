@@ -1,9 +1,10 @@
-use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
+use std::ops::Neg;
+
+use crate::world_generation::chunk_generation::{CHUNK_SIZE, VOXEL_SIZE};
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy::render::render_asset::RenderAssetUsages;
-use rand::Rng;
 
 use super::voxel_types::VoxelData;
 
@@ -19,385 +20,143 @@ pub fn generate_mesh(
     let mut triangles: Vec<[u32; 3]> = Vec::new();
     // let mut colors: Vec<[f32; 4]> = Vec::new();
 
-    let mut rng = rand::thread_rng();
+    fn rotate_into_direction<T: Vec3Swizzles + Neg<Output = T>>(vector: T, direction: IVec3) -> T {
+        match direction {
+            IVec3::X | IVec3::NEG_X => vector.xzy(),
+            IVec3::Y | IVec3::NEG_Y => vector.yxz(),
+            IVec3::Z | IVec3::NEG_Z => vector.zyx(),
+            _ => vector,
+        }
+    }
 
-    for x in 1..CHUNK_SIZE[0] + 1 {
-        for y in 1..CHUNK_SIZE[1] + 1 {
-            for z in 1..CHUNK_SIZE[2] + 1 {
-                if blocks.is_air(x, y, z) || all_neighbours([x, y, z], &blocks) {
-                    continue;
-                }
+    let mut generate_sides = |direction: IVec3| {
+        for i in 1..CHUNK_SIZE + 1 {
+            let mut done_faces = [[false; CHUNK_SIZE]; CHUNK_SIZE];
+            for j in 1..CHUNK_SIZE + 1 {
+                for k in 1..CHUNK_SIZE + 1 {
+                    let current_pos =
+                        rotate_into_direction(IVec3::new(i as i32, j as i32, k as i32), direction);
 
-                let x_pos = x as f32;
-                let y_pos = y as f32;
-                let z_pos = z as f32;
-                // let mut color = blocks[x][y][z].get_color();
-                // color[0] = color[0] * rng.gen_range(0.9..1.);
-                // color[1] = color[1] * rng.gen_range(0.9..1.);
-                // color[2] = color[2] * rng.gen_range(0.9..1.);
+                    let height_dir = rotate_into_direction(IVec3::Y, direction);
+                    let width_dir = rotate_into_direction(IVec3::Z, direction);
 
-                if blocks.is_air(x, y + 1, z) {
+                    let width_pos = (current_pos * width_dir).max_element();
+                    let height_pos = (current_pos * height_dir).max_element();
+
+                    if done_faces[width_pos as usize - 1][height_pos as usize - 1]
+                        || blocks.is_air(current_pos)
+                        || !blocks.is_air(current_pos + direction)
+                    {
+                        continue;
+                    }
+
+                    let mut height = 1;
+                    let mut width = 1;
+
+                    while height_pos + height <= CHUNK_SIZE as i32
+                        && !done_faces[width_pos as usize - 1]
+                            [height_pos as usize + height as usize - 1]
+                        && !blocks.is_air(current_pos + (height_dir * height))
+                        && blocks.is_air(current_pos + (height_dir * height) + direction)
+                    {
+                        height += 1;
+                    }
+
+                    while width_pos + width <= CHUNK_SIZE as i32
+                        && (0..height).all(|height| {
+                            !done_faces[width_pos as usize + width as usize - 1]
+                                [height_pos as usize + height as usize - 1]
+                                && !blocks.is_air(
+                                    current_pos
+                                        + (width_dir * width as i32)
+                                        + (height_dir * height as i32),
+                                )
+                                && blocks.is_air(
+                                    current_pos
+                                        + (width_dir * width as i32)
+                                        + (height_dir * height as i32)
+                                        + direction,
+                                )
+                        })
+                    {
+                        width += 1;
+                    }
+
+                    for x in width_pos..width_pos + width {
+                        for y in height_pos..height_pos + height {
+                            done_faces[x as usize - 1][y as usize - 1] = true;
+                        }
+                    }
+
+                    let height = height as f32 - 1.;
+                    let width = width as f32 - 1.;
+
                     let positions_count = positions.len() as u32;
 
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x][y + 1][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x][y + 1][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x][y + 1][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x][y + 1][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    // ];
+                    let vertex_pos = current_pos.as_vec3();
 
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
+                    let direction_adder = direction * (direction.min_element().abs());
 
                     positions.extend_from_slice(&[
-                        [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
+                        (vertex_pos
+                            + (rotate_into_direction(Vec3::new(0.5, -0.5, -0.5), direction))
+                            + direction_adder.as_vec3())
+                        .to_array(),
+                        (vertex_pos
+                            + (rotate_into_direction(
+                                Vec3::new(0.5, -0.5, 0.5 + width),
+                                direction,
+                            ))
+                            + direction_adder.as_vec3())
+                        .to_array(),
+                        (vertex_pos
+                            + (rotate_into_direction(
+                                Vec3::new(0.5, 0.5 + height, 0.5 + width),
+                                direction,
+                            ))
+                            + direction_adder.as_vec3())
+                        .to_array(),
+                        (vertex_pos
+                            + (rotate_into_direction(
+                                Vec3::new(0.5, 0.5 + height, -0.5),
+                                direction,
+                            ))
+                            + direction_adder.as_vec3())
+                        .to_array(),
                     ]);
 
                     normals.extend_from_slice(&[
-                        [0., 1., 0.],
-                        [0., 1., 0.],
-                        [0., 1., 0.],
-                        [0., 1., 0.],
+                        direction.as_vec3().to_array(),
+                        direction.as_vec3().to_array(),
+                        direction.as_vec3().to_array(),
+                        direction.as_vec3().to_array(),
                     ]);
+
+                    let invert = !direction.min_element() < 0;
 
                     triangles.extend_from_slice(&[
                         [
                             positions_count + 0,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
+                            positions_count + if invert { 1 } else { 3 },
+                            positions_count + if invert { 3 } else { 1 },
+                        ],
+                        [
                             positions_count + 1,
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 3,
-                            positions_count + 2,
-                        ],
-                    ]);
-                }
-
-                if blocks.is_air(x, y - 1, z) {
-                    let positions_count = positions.len() as u32;
-
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x][y - 1][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x][y - 1][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x][y - 1][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x][y - 1][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    // ];
-
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
-
-                    positions.extend_from_slice(&[
-                        [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
-                    ]);
-
-                    normals.extend_from_slice(&[
-                        [0., -1., 0.],
-                        [0., -1., 0.],
-                        [0., -1., 0.],
-                        [0., -1., 0.],
-                    ]);
-
-                    triangles.extend_from_slice(&[
-                        [
-                            positions_count + 0,
-                            positions_count + 1,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 2,
-                            positions_count + 3,
-                        ],
-                    ]);
-                }
-
-                if blocks.is_air(x + 1, y, z) {
-                    let positions_count = positions.len() as u32;
-
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x + 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x + 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x + 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x + 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    // ];
-
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
-
-                    positions.extend_from_slice(&[
-                        [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
-                    ]);
-
-                    normals.extend_from_slice(&[
-                        [1., 0., 0.],
-                        [1., 0., 0.],
-                        [1., 0., 0.],
-                        [1., 0., 0.],
-                    ]);
-
-                    triangles.extend_from_slice(&[
-                        [
-                            positions_count + 0,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
-                            positions_count + 1,
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 3,
-                            positions_count + 2,
-                        ],
-                    ]);
-                }
-
-                if blocks.is_air(x - 1, y, z) {
-                    let positions_count = positions.len() as u32;
-
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x - 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y - 1][z] != BlockType::Air,
-                    //         blocks[x - 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x - 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y + 1][z] != BlockType::Air,
-                    //         blocks[x - 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    // ];
-
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
-
-                    positions.extend_from_slice(&[
-                        [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
-                        [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
-                    ]);
-
-                    normals.extend_from_slice(&[
-                        [-1., 0., 0.],
-                        [-1., 0., 0.],
-                        [-1., 0., 0.],
-                        [-1., 0., 0.],
-                    ]);
-
-                    triangles.extend_from_slice(&[
-                        [
-                            positions_count + 0,
-                            positions_count + 1,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 2,
-                            positions_count + 3,
-                        ],
-                    ]);
-                }
-
-                if blocks.is_air(x, y, z + 1) {
-                    let positions_count = positions.len() as u32;
-
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x][y - 1][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x][y + 1][z + 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x][y + 1][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z + 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y][z + 1] != BlockType::Air,
-                    //         blocks[x][y - 1][z + 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z + 1] != BlockType::Air,
-                    //     ),
-                    // ];
-
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
-
-                    positions.extend_from_slice(&[
-                        [x_pos - 0.5, y_pos - 0.5, z_pos + 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos + 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos + 0.5],
-                    ]);
-
-                    normals.extend_from_slice(&[
-                        [0., 0., 1.],
-                        [0., 0., 1.],
-                        [0., 0., 1.],
-                        [0., 0., 1.],
-                    ]);
-
-                    triangles.extend_from_slice(&[
-                        [
-                            positions_count + 0,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
-                            positions_count + 1,
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 3,
-                            positions_count + 2,
-                        ],
-                    ]);
-                }
-
-                if blocks.is_air(x, y, z - 1) {
-                    let positions_count = positions.len() as u32;
-
-                    // let aos = [
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x][y - 1][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x - 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x][y + 1][z - 1] != BlockType::Air,
-                    //         blocks[x - 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x][y + 1][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y + 1][z - 1] != BlockType::Air,
-                    //     ),
-                    //     calculate_ambient_occlusion(
-                    //         blocks[x + 1][y][z - 1] != BlockType::Air,
-                    //         blocks[x][y - 1][z - 1] != BlockType::Air,
-                    //         blocks[x + 1][y - 1][z - 1] != BlockType::Air,
-                    //     ),
-                    // ];
-
-                    // add_colors(&mut colors, color, &aos);
-
-                    // let rotate_quad = (aos[1] + aos[3]) < (aos[0] + aos[2]);
-
-                    let rotate_quad = false;
-
-                    positions.extend_from_slice(&[
-                        [x_pos - 0.5, y_pos - 0.5, z_pos - 0.5],
-                        [x_pos - 0.5, y_pos + 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos + 0.5, z_pos - 0.5],
-                        [x_pos + 0.5, y_pos - 0.5, z_pos - 0.5],
-                    ]);
-
-                    normals.extend_from_slice(&[
-                        [0., 0., -1.],
-                        [0., 0., -1.],
-                        [0., 0., -1.],
-                        [0., 0., -1.],
-                    ]);
-
-                    triangles.extend_from_slice(&[
-                        [
-                            positions_count + 0,
-                            positions_count + 1,
-                            positions_count + (if rotate_quad { 2 } else { 3 }),
-                        ],
-                        [
-                            positions_count + (if rotate_quad { 0 } else { 1 }),
-                            positions_count + 2,
-                            positions_count + 3,
+                            positions_count + if invert { 2 } else { 3 },
+                            positions_count + if invert { 3 } else { 2 },
                         ],
                     ]);
                 }
             }
         }
-    }
+    };
+
+    generate_sides(IVec3::X);
+    generate_sides(IVec3::NEG_X);
+    generate_sides(IVec3::Z);
+    generate_sides(IVec3::NEG_Z);
+    generate_sides(IVec3::Y);
+    generate_sides(IVec3::NEG_Y);
 
     if triangles.is_empty() {
         return None;
@@ -431,7 +190,6 @@ pub fn generate_mesh(
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 
-    // mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh.insert_indices(Indices::U32(mesh_triangles));
 
     Some((
@@ -443,54 +201,4 @@ pub fn generate_mesh(
             Vec::new()
         },
     ))
-}
-
-fn all_neighbours(pos: [usize; 3], blocks: &VoxelData) -> bool {
-    if blocks.is_air(pos[0], pos[1] + 1, pos[2]) {
-        return false;
-    }
-    if blocks.is_air(pos[0], pos[1] - 1, pos[2]) {
-        return false;
-    }
-    if blocks.is_air(pos[0] + 1, pos[1], pos[2]) {
-        return false;
-    }
-    if blocks.is_air(pos[0] - 1, pos[1], pos[2]) {
-        return false;
-    }
-    if blocks.is_air(pos[0], pos[1], pos[2] + 1) {
-        return false;
-    }
-    if blocks.is_air(pos[0], pos[1], pos[2] - 1) {
-        return false;
-    }
-    return true;
-}
-
-fn calculate_ambient_occlusion(side1: bool, side2: bool, corner: bool) -> f32 {
-    if side1 && side2 {
-        return 0.1;
-    }
-    if (side1 || side2) && corner {
-        return 0.25;
-    }
-    if side1 || side2 || corner {
-        return 0.5;
-    }
-    return 1.;
-}
-
-fn add_colors(
-    colors: &mut Vec<[f32; 4]>,
-    color: [f32; 4],
-    ambient_occlusion_multipliers: &[f32; 4],
-) {
-    for i in 0..4 {
-        colors.push([
-            color[0] * ambient_occlusion_multipliers[i],
-            color[1] * ambient_occlusion_multipliers[i],
-            color[2] * ambient_occlusion_multipliers[i],
-            color[3],
-        ]);
-    }
 }

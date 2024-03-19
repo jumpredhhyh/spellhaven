@@ -46,11 +46,10 @@ pub fn generate_voxels(
 
     let terrain_noise = get_terrain_noise(chunk_lod, generation_options);
 
-    let mut terrain_height = [[0f32; CHUNK_SIZE[0] + 2]; CHUNK_SIZE[0] + 2];
-    let mut terrain_steepness = [[0f32; CHUNK_SIZE[0]]; CHUNK_SIZE[0]];
+    let mut terrain_height = [[0f32; CHUNK_SIZE + 2]; CHUNK_SIZE + 2];
+    let mut terrain_steepness = [[0f32; CHUNK_SIZE]; CHUNK_SIZE];
     get_noise_map(
-        IVec2::new(position[0], position[2])
-            * IVec2::new(CHUNK_SIZE[0] as i32, CHUNK_SIZE[2] as i32),
+        IVec2::new(position[0], position[2]) * IVec2::new(CHUNK_SIZE as i32, CHUNK_SIZE as i32),
         chunk_lod.multiplier_i32(),
         &terrain_noise,
         &mut terrain_height,
@@ -58,7 +57,7 @@ pub fn generate_voxels(
     get_steepness_map(&mut terrain_steepness, &terrain_height);
 
     let min_height = (get_min_in_noise_map(&terrain_height) as i32).max(2) - 2
-        + position[1] * CHUNK_SIZE[1] as i32
+        + position[1] * CHUNK_SIZE as i32
         - 10 / chunk_lod.multiplier_i32();
 
     let mut generate_more: bool = false;
@@ -69,17 +68,15 @@ pub fn generate_voxels(
         &country_cache.left_path_cache.paths,
     ];
 
-    for x in 0..CHUNK_SIZE[0] + 2 {
-        for z in 0..CHUNK_SIZE[2] + 2 {
-            let total_x =
-                position[0] * CHUNK_SIZE[0] as i32 + x as i32 * chunk_lod.multiplier_i32();
-            let total_z =
-                position[2] * CHUNK_SIZE[2] as i32 + z as i32 * chunk_lod.multiplier_i32();
+    for x in 0..CHUNK_SIZE + 2 {
+        for z in 0..CHUNK_SIZE + 2 {
+            let total_x = position[0] * CHUNK_SIZE as i32 + x as i32 * chunk_lod.multiplier_i32();
+            let total_z = position[2] * CHUNK_SIZE as i32 + z as i32 * chunk_lod.multiplier_i32();
 
             //let dryness = value_noise.get([total_x as f64, total_z as f64]);
             //let mountain = mountain_noise.get([total_x as f64, total_z as f64]);
 
-            let steepness = if x > 0 && z > 0 && x <= CHUNK_SIZE[0] && z <= CHUNK_SIZE[2] {
+            let steepness = if x > 0 && z > 0 && x <= CHUNK_SIZE && z <= CHUNK_SIZE {
                 terrain_steepness[x - 1][z - 1]
             } else {
                 0.
@@ -126,15 +123,13 @@ pub fn generate_voxels(
             }
 
             for y in min_height as usize
-                ..noise_height.min((CHUNK_SIZE[1] + 2 + min_height as usize) as f32) as usize
+                ..noise_height.min((CHUNK_SIZE + 2 + min_height as usize) as f32) as usize
             {
-                if y == CHUNK_SIZE[1] + 1 + min_height as usize {
+                if y == CHUNK_SIZE + 1 + min_height as usize {
                     generate_more = true;
                 }
                 blocks.set_block(
-                    x,
-                    y - min_height as usize,
-                    z,
+                    [x as i32, y as i32 - min_height, z as i32],
                     if is_path {
                         BlockType::Path
                     } else {
@@ -166,19 +161,18 @@ pub fn generate_voxels(
                     * 0.5
                     + 0.5;
                 if structure.generate_debug_blocks {
-                    let top_terrain = (noise_height.min(CHUNK_SIZE[1] as f32 + min_height as f32)
+                    let top_terrain = (noise_height.min(CHUNK_SIZE as f32 + min_height as f32)
                         as i32
                         - min_height.min(noise_height as i32))
                     .max(1) as usize
                         - 1;
-                    let current_color = match blocks.get_block(x, top_terrain, z) {
-                        BlockType::StructureDebug(r, g, b) => (r, g, b),
-                        _ => (0u8, 0u8, 0u8),
-                    };
+                    let current_color =
+                        match blocks.get_block([x as i32, top_terrain as i32, z as i32]) {
+                            BlockType::StructureDebug(r, g, b) => (r, g, b),
+                            _ => (0u8, 0u8, 0u8),
+                        };
                     blocks.set_block(
-                        x,
-                        top_terrain,
-                        z,
+                        [x as i32, top_terrain as i32, z as i32],
                         BlockType::StructureDebug(
                             ((structure_value) * structure.debug_rgb_multiplier[0] * 255.) as u8
                                 + current_color.0,
@@ -271,15 +265,17 @@ pub fn generate_voxels(
                             continue;
                         }
                         if noise_height as usize + chunk_index - min_height as usize
-                            >= CHUNK_SIZE[1] + 2
+                            >= CHUNK_SIZE + 2
                         {
                             generate_more = true;
                             break;
                         }
                         blocks.set_block(
-                            x,
-                            noise_height as usize + chunk_index - min_height as usize,
-                            z,
+                            [
+                                x as i32,
+                                noise_height as i32 + chunk_index as i32 - min_height as i32,
+                                z as i32,
+                            ],
                             structure_block,
                         );
                     }

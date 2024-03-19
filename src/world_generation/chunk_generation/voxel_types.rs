@@ -4,7 +4,10 @@ use std::{
     usize,
 };
 
-use bevy::render::render_resource::{ShaderSize, ShaderType};
+use bevy::{
+    math::{IVec3, UVec3},
+    render::render_resource::{ShaderSize, ShaderType},
+};
 
 use super::{BlockType, CHUNK_SIZE};
 
@@ -43,7 +46,7 @@ impl<T: ShaderSize> IndexMut<usize> for Vec4<T> {
 }
 
 pub type VoxelArray =
-    [Vec4<u32>; ((CHUNK_SIZE[0] + 2) * (CHUNK_SIZE[1] + 2) * (CHUNK_SIZE[2] + 2) / 4 + 3) / 4];
+    [Vec4<u32>; ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4];
 pub type VoxelPalette = [Vec4<u32>; 8];
 
 pub struct VoxelData {
@@ -56,7 +59,7 @@ impl Default for VoxelData {
     fn default() -> Self {
         Self {
             array: [Vec4::<u32>::default();
-                ((CHUNK_SIZE[0] + 2) * (CHUNK_SIZE[1] + 2) * (CHUNK_SIZE[2] + 2) / 4 + 3) / 4],
+                ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4],
             palette: [Vec4::<u32>::default(); 8],
             block_map: Default::default(),
         }
@@ -64,8 +67,8 @@ impl Default for VoxelData {
 }
 
 impl VoxelData {
-    pub fn is_air(&self, x: usize, y: usize, z: usize) -> bool {
-        let (outer_index, inner_index) = Self::position_to_indexes(x, y, z);
+    pub fn is_air<T: Into<IVec3>>(&self, position: T) -> bool {
+        let (outer_index, inner_index) = Self::position_to_indexes(position);
         let divided_index = inner_index / 4;
         let index_remainder = inner_index % 4;
 
@@ -74,8 +77,8 @@ impl VoxelData {
         (self.array[outer_index][divided_index] & mask) == 0
     }
 
-    pub fn get_block(&self, x: usize, y: usize, z: usize) -> BlockType {
-        let (outer_index, inner_index) = Self::position_to_indexes(x, y, z);
+    pub fn get_block<T: Into<IVec3>>(&self, position: T) -> BlockType {
+        let (outer_index, inner_index) = Self::position_to_indexes(position);
         let divided_index = inner_index / 4;
         let index_remainder = inner_index % 4;
 
@@ -90,8 +93,8 @@ impl VoxelData {
             .unwrap_or(&BlockType::Air)
     }
 
-    pub fn set_block(&mut self, x: usize, y: usize, z: usize, block: BlockType) {
-        let (outer_index, inner_index) = Self::position_to_indexes(x, y, z);
+    pub fn set_block<T: Into<IVec3>>(&mut self, position: T, block: BlockType) {
+        let (outer_index, inner_index) = Self::position_to_indexes(position);
         let divided_index = inner_index / 4;
         let index_remainder = inner_index % 4;
 
@@ -129,8 +132,11 @@ impl VoxelData {
         current_index
     }
 
-    fn position_to_indexes(x: usize, y: usize, z: usize) -> (usize, usize) {
-        let index = x + (y * (CHUNK_SIZE[0] + 2)) + (z * (CHUNK_SIZE[0] + 2) * (CHUNK_SIZE[1] + 2));
+    fn position_to_indexes<T: Into<IVec3>>(position: T) -> (usize, usize) {
+        let position: IVec3 = position.into();
+        let index = position.x as usize
+            + (position.y as usize * (CHUNK_SIZE + 2))
+            + (position.z as usize * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2));
         (index / 16, index % 16)
     }
 }

@@ -30,7 +30,7 @@ pub mod voxel_generation;
 pub mod voxel_types;
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
-pub const CHUNK_SIZE: [usize; 3] = [64, 64, 64];
+pub const CHUNK_SIZE: usize = 64;
 pub const VOXEL_SIZE: f32 = 0.5;
 
 pub struct ChunkTaskData {
@@ -169,11 +169,11 @@ fn start_chunk_tasks(
         let country_pos = IVec2::new(
             div_floor(
                 parent_pos.x,
-                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[0] as i32),
+                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE as i32),
             ),
             div_floor(
                 parent_pos.y,
-                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE[2] as i32),
+                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE as i32),
             ),
         );
 

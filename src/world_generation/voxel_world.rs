@@ -155,9 +155,9 @@ impl VoxelWorld for QuadTreeVoxelWorld {
                 None => None,
                 Some(mesh) => Some(ChunkTaskData {
                     transform: Transform::from_xyz(
-                        new_chunk_pos[0] as f32 * CHUNK_SIZE[0] as f32 * VOXEL_SIZE,
+                        new_chunk_pos[0] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
                         0.0,
-                        new_chunk_pos[2] as f32 * CHUNK_SIZE[2] as f32 * VOXEL_SIZE,
+                        new_chunk_pos[2] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
                     ),
                     collider: if chunk_lod == ChunkLod::Full {
                         Some(Collider::trimesh(mesh.1, mesh.2))

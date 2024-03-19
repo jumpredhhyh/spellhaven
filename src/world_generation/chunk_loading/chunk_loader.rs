@@ -103,9 +103,9 @@ fn unload_chunks(
 
 pub fn get_chunk_position(global_position: Vec3, lod: ChunkLod) -> [i32; 2] {
     [
-        (global_position.x / (CHUNK_SIZE[0] as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor()
+        (global_position.x / (CHUNK_SIZE as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor()
             as i32,
-        (global_position.z / (CHUNK_SIZE[2] as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor()
+        (global_position.z / (CHUNK_SIZE as f32 * VOXEL_SIZE * lod.multiplier_f32())).floor()
             as i32,
     ]
 }
