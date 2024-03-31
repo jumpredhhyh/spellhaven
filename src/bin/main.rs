@@ -14,7 +14,13 @@ use std::f32::consts::PI;
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    present_mode: bevy::window::PresentMode::Immediate,
+                    ..default()
+                }),
+                ..default()
+            }),
             PanOrbitCameraPlugin,
             ChunkGenerationPlugin,
             AtmospherePlugin,
