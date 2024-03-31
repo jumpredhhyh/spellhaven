@@ -5,6 +5,7 @@ use std::{
 };
 
 use bevy::{
+    log::error,
     math::{IVec3, UVec3},
     render::render_resource::{ShaderSize, ShaderType},
 };
@@ -98,12 +99,18 @@ impl VoxelData {
         let divided_index = inner_index / 4;
         let index_remainder = inner_index % 4;
 
-        let previous = self.array[outer_index][divided_index];
+        let previous_mask = !(0xffu32 << (index_remainder * 8));
+
+        let previous = self.array[outer_index][divided_index] & previous_mask;
 
         let palette_index = self.get_palette_index(block) as u32;
 
+        if palette_index > 0xff {
+            error!("Palette index too high!");
+        }
+
         self.array[outer_index][divided_index] =
-            previous | (palette_index << (index_remainder * 8));
+            previous | (palette_index.min(0xffu32) << (index_remainder * 8));
     }
 
     fn get_palette_index(&mut self, block: BlockType) -> u8 {
