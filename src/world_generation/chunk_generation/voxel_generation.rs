@@ -10,10 +10,9 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{IVec2, IVec3};
 use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
-use noise::core::worley::distance_functions::{
-    chebyshev, euclidean, euclidean_squared, manhattan, quadratic,
-};
+use noise::core::worley::distance_functions::{chebyshev, euclidean, euclidean_squared, manhattan};
 use noise::core::worley::ReturnType;
+use noise::permutationtable::PermutationTable;
 use noise::{
     Add, Clamp, Constant, Fbm, Min, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable,
     Turbulence, Worley,
@@ -22,6 +21,7 @@ use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 
+use super::noise::fractal_open_simplex::noise;
 use super::voxel_types::VoxelData;
 
 pub struct StructureGenerator {
@@ -82,6 +82,17 @@ pub fn generate_voxels(
                 0.
             };
 
+            let derivative = noise(
+                total_x as f64,
+                total_z as f64,
+                0.5f64.powi(14),
+                1.,
+                &PermutationTable::new(123),
+            )
+            .1;
+
+            let flatness = derivative[0].abs() + derivative[1].abs();
+
             let mut noise_height = terrain_height[x][z];
 
             let is_snow = noise_height * chunk_lod.multiplier_f32() > 3500. / VOXEL_SIZE;
@@ -130,19 +141,20 @@ pub fn generate_voxels(
                 }
                 blocks.set_block(
                     [x as i32, y as i32 - min_height, z as i32],
-                    if is_path {
-                        BlockType::Path
-                    } else {
-                        if is_grass_steep && y + 1 == noise_height.floor() as usize {
-                            if is_snow {
-                                BlockType::Snow
-                            } else {
-                                BlockType::Grass
-                            }
-                        } else {
-                            BlockType::Stone
-                        }
-                    },
+                    BlockType::Gray((flatness / 5. * 255.) as u8),
+                    // if is_path {
+                    //     BlockType::Path
+                    // } else {
+                    //     if is_grass_steep && y + 1 == noise_height.floor() as usize {
+                    //         if is_snow {
+                    //             BlockType::Snow
+                    //         } else {
+                    //             BlockType::Grass
+                    //         }
+                    //     } else {
+                    //         BlockType::Stone
+                    //     }
+                    // },
                 );
             }
 
@@ -290,108 +302,61 @@ pub fn generate_voxels(
 pub fn get_terrain_noise(
     chunk_lod: ChunkLod,
     generation_options: &GenerationOptions,
-) -> Add<
-    f64,
-    Multiply<
-        f64,
-        Add<
-            f64,
-            Add<
-                f64,
-                Add<
-                    f64,
-                    FractalOpenSimplex<Roughness>,
-                    Multiply<
-                        f64,
-                        Multiply<
-                            f64,
-                            Clamp<f64, ScalePoint<Perlin>, 2>,
-                            Clamp<
-                                f64,
-                                Multiply<
-                                    f64,
-                                    Add<
-                                        f64,
-                                        Multiply<f64, Turbulence<Worley, Perlin>, Constant, 2>,
-                                        Constant,
-                                        2,
-                                    >,
-                                    Constant,
-                                    2,
-                                >,
-                                2,
-                            >,
-                            2,
-                        >,
-                        Constant,
-                        2,
-                    >,
-                    2,
-                >,
-                FractalOpenSimplex<Roughness>,
-                2,
-            >,
-            Constant,
-            2,
-        >,
-        Constant,
-        2,
-    >,
-    Constant,
-    2,
-> {
+) -> impl NoiseFn<f64, 2> {
     let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
 
     Add::new(
         Multiply::new(
             Add::new(
                 Add::new(
-                    Add::new(
-                        FractalOpenSimplex::new(
-                            rng.gen(),
-                            0.5f64.powi(10),
-                            256.,
-                            7,
-                            2.,
-                            0.5,
-                            Roughness::new(1, 0.5f64.powi(10), 0.2),
-                        ),
-                        Multiply::new(
-                            Multiply::new(
-                                Clamp::new(
-                                    ScalePoint::new(Perlin::new(rng.gen()))
-                                        .set_scale(0.5f64.powi(15)),
-                                )
-                                .set_bounds(0., 1.),
-                                Clamp::new(Multiply::new(
-                                    Add::new(
-                                        Multiply::new(
-                                            Turbulence::<Worley, Perlin>::new(
-                                                Worley::new(rng.gen())
-                                                    .set_frequency(0.5f64.powi(13))
-                                                    .set_distance_function(&euclidean_squared)
-                                                    .set_return_type(ReturnType::Distance),
-                                            )
-                                            .set_frequency(0.5f64.powi(10))
-                                            .set_power(300.)
-                                            .set_roughness(5)
-                                            .set_seed(rng.gen()),
-                                            Constant::new(-1.),
-                                        ),
-                                        Constant::new(1.),
-                                    ),
-                                    Constant::new(0.5),
-                                ))
-                                .set_bounds(0., 1.),
-                            ),
-                            Constant::new(10000.),
-                        ),
-                    ),
+                    // Add::new(
+                    //     FractalOpenSimplex::new(
+                    //         rng.gen(),
+                    //         0.5f64.powi(10),
+                    //         256.,
+                    //         7,
+                    //         2.,
+                    //         0.5,
+                    //         Roughness::new(1, 0.5f64.powi(10), 0.2),
+                    //     ),
+                    //     Constant::new(0.),
+                    //     // Multiply::new(
+                    //     //     Multiply::new(
+                    //     //         Clamp::new(
+                    //     //             ScalePoint::new(Perlin::new(rng.gen()))
+                    //     //                 .set_scale(0.5f64.powi(15)),
+                    //     //         )
+                    //     //         .set_bounds(0., 1.),
+                    //     //         Clamp::new(Multiply::new(
+                    //     //             Add::new(
+                    //     //                 Multiply::new(
+                    //     //                     Turbulence::<Worley, Perlin>::new(
+                    //     //                         Worley::new(rng.gen())
+                    //     //                             .set_frequency(0.5f64.powi(13))
+                    //     //                             .set_distance_function(&euclidean_squared)
+                    //     //                             .set_return_type(ReturnType::Distance),
+                    //     //                     )
+                    //     //                     .set_frequency(0.5f64.powi(10))
+                    //     //                     .set_power(300.)
+                    //     //                     .set_roughness(5)
+                    //     //                     .set_seed(rng.gen()),
+                    //     //                     Constant::new(-1.),
+                    //     //                 ),
+                    //     //                 Constant::new(1.),
+                    //     //             ),
+                    //     //             Constant::new(0.5),
+                    //     //         ))
+                    //     //         .set_bounds(0., 1.),
+                    //     //     ),
+                    //     //     Constant::new(10000.),
+                    //     // ),
+                    // ),
+                    Constant::new(0.),
                     FractalOpenSimplex::new(
-                        rng.gen(),
-                        0.5f64.powi(15),
-                        4096.,
-                        7,
+                        123,
+                        0.5f64.powi(14),
+                        8192.,
+                        1,
                         2.,
                         0.5,
                         Roughness::new(1, 0.5f64.powi(13), 0.2),

@@ -25,10 +25,13 @@ bevy = { version = "0.13.0" }
 bevy_panorbit_camera = "0.16.0"
 rand = "0.8.5"
 futures-lite = "1.13.0"
-noise = "0.8"
+noise = "0.9"
 bevy_atmosphere = "0.9.0"
 fastrand = { version = "2.0.1", features = [] }
-bevy_rapier3d = { version = "0.25.0", features = [ "simd-stable", "debug-render-3d" ] }
+bevy_rapier3d = { version = "0.25.0", features = [
+    "simd-stable",
+    "debug-render-3d",
+] }
 vox-format = "0.1.0"
 bevy-inspector-egui = "0.23.3"
 bracket-noise = "0.8.7"

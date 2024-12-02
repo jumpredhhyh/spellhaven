@@ -50,6 +50,7 @@ impl NoiseFn<f64, 2usize> for Roughness {
             self.frequency,
             self.amplitude,
             &self.permutation_table,
-        ) - 0.15
+        )
+        .0 - 0.15
     }
 }
