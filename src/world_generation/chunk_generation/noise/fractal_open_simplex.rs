@@ -1,6 +1,6 @@
-use noise::core::open_simplex::open_simplex_2d;
+use noise::core::simplex::simplex_2d;
 use noise::permutationtable::PermutationTable;
-use noise::{NoiseFn, Seedable};
+use noise::{NoiseFn, Seedable, Vector2};
 
 #[derive(Clone, Copy, Debug)]
 pub struct FractalOpenSimplex<R>
@@ -21,6 +21,8 @@ impl<R> FractalOpenSimplex<R>
 where
     R: NoiseFn<f64, 2usize>,
 {
+    pub const DEFAULT_SEED: u32 = 0;
+
     pub fn new(
         seed: u32,
         frequency: f64,
@@ -74,7 +76,7 @@ where
     R: NoiseFn<f64, 2usize>,
 {
     fn get(&self, point: [f64; 2]) -> f64 {
-        let roughness = self.roughness.get(point);
+        let roughness = 0.; //self.roughness.get(point);
         fractal_noise(
             point[0],
             point[1],
@@ -100,20 +102,31 @@ pub fn fractal_noise(
     hasher: &PermutationTable,
 ) -> f64 {
     let mut noise_value: f64 = 0.;
+    let mut total_flatness: f64 = 0.;
 
     for octave in 0..octaves {
-        noise_value += noise(
+        let result = noise(
             x,
             z,
             frequency * lacunarity.powi(octave),
             amplitude * persistence.powi(octave),
             hasher,
-        )
+        );
+        let flatness = result.1[0].abs() + result.1[1].abs();
+        total_flatness += flatness;
+        noise_value += result.0; // * (1. / (1. + total_flatness));
     }
 
     noise_value
 }
 
-pub fn noise(x: f64, z: f64, frequency: f64, amplitude: f64, hasher: &PermutationTable) -> f64 {
-    (open_simplex_2d([x * frequency, z * frequency].into(), hasher) + 0.5) * amplitude
+pub fn noise(
+    x: f64,
+    z: f64,
+    frequency: f64,
+    amplitude: f64,
+    hasher: &PermutationTable,
+) -> (f64, [f64; 2]) {
+    let result = simplex_2d(Vector2::new(x * frequency, z * frequency), hasher);
+    ((result.0 + 1.) * 0.5 * amplitude, result.1)
 }
