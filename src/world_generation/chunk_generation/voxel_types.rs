@@ -6,7 +6,7 @@ use std::{
 
 use bevy::{
     log::error,
-    math::{IVec3, UVec3},
+    math::IVec3,
     render::render_resource::{ShaderSize, ShaderType},
 };
 

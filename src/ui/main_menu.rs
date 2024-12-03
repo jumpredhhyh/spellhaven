@@ -1,9 +1,8 @@
 use crate::player::PlayerSpawnCallback;
 use crate::world_generation::generation_options::GenerationOptionsResource;
 use bevy::app::App;
-use bevy::prelude::{info, Commands, Plugin, Res, ResMut, Resource, Update, With, World};
-use bevy::window::PrimaryWindow;
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts};
+use bevy::prelude::{info, Commands, Plugin, Res, ResMut, Resource, Update};
+use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_inspector_egui::egui;
 use std::hash::{DefaultHasher, Hash, Hasher};
 

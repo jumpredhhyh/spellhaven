@@ -41,18 +41,6 @@ struct PlayerBody;
 #[derive(Component)]
 struct PlayerCamera;
 
-#[derive(Component)]
-struct PlayerSteppingCastX;
-
-#[derive(Component)]
-struct PlayerSteppingCastNegX;
-
-#[derive(Component)]
-struct PlayerSteppingCastZ;
-
-#[derive(Component)]
-struct PlayerSteppingCastNegZ;
-
 #[derive(Resource)]
 pub struct PlayerSpawnCallback(pub SystemId);
 
@@ -234,7 +222,7 @@ fn movement(
 
         if let Ok(player_camera) = player_camera.get_single() {
             // Rotate vector to camera
-            let rotation = Quat::from_rotation_y(player_camera.alpha.unwrap_or(0.));
+            let rotation = Quat::from_rotation_y(player_camera.yaw.unwrap_or(0.));
             move_direction = rotation.mul_vec3(move_direction.normalize_or_zero() * movement_speed);
         }
 

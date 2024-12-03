@@ -4,7 +4,7 @@ use crate::world_generation::chunk_generation::{ChunkTaskData, CHUNK_SIZE, VOXEL
 use crate::world_generation::chunk_loading::country_cache::CountryCache;
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
 use crate::world_generation::generation_options::GenerationOptions;
-use bevy::math::{IVec3, IVec4, Vec3Swizzles};
+use bevy::math::IVec3;
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use std::collections::HashMap;
@@ -141,7 +141,7 @@ impl VoxelWorld for QuadTreeVoxelWorld {
             parent_pos.y * MAX_LOD.multiplier_i32() + lod_position.y * chunk_lod.multiplier_i32(),
         ];
 
-        let (mut data, min_height, more) = generate_voxels(
+        let (data, min_height, more) = generate_voxels(
             new_chunk_pos,
             &generation_options,
             chunk_lod,

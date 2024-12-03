@@ -11,8 +11,6 @@ pub struct Roughness {
 }
 
 impl Roughness {
-    pub const DEFAULT_SEED: u32 = 0;
-
     pub fn new(seed: u32, frequency: f64, amplitude: f64) -> Self {
         Self {
             seed,

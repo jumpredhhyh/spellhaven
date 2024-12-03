@@ -21,8 +21,6 @@ impl<R> FractalOpenSimplex<R>
 where
     R: NoiseFn<f64, 2usize>,
 {
-    pub const DEFAULT_SEED: u32 = 0;
-
     pub fn new(
         seed: u32,
         frequency: f64,
@@ -117,5 +115,5 @@ pub fn fractal_noise(
 }
 
 pub fn noise(x: f64, z: f64, frequency: f64, amplitude: f64, hasher: &PermutationTable) -> f64 {
-    (open_simplex_2d([x * frequency, z * frequency], hasher) + 0.5) * amplitude
+    (open_simplex_2d([x * frequency, z * frequency].into(), hasher) + 0.5) * amplitude
 }

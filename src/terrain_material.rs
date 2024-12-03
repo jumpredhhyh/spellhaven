@@ -1,13 +1,10 @@
 use bevy::{
     pbr::MaterialExtension,
     prelude::*,
-    render::{
-        mesh::MeshVertexAttribute,
-        render_resource::{AsBindGroup, ShaderRef, VertexFormat},
-    },
+    render::render_resource::{AsBindGroup, ShaderRef},
 };
 
-use crate::world_generation::chunk_generation::voxel_types::{Vec4, VoxelArray, VoxelPalette};
+use crate::world_generation::chunk_generation::voxel_types::{VoxelArray, VoxelPalette};
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct TerrainMaterial {
