@@ -10,14 +10,13 @@ pub struct GFT<T> {
     pub gradient: f64,
     pub amplitude: f64,
 
-    sources: Vec<T>,
-    seed: u32,
+    source: T,
     scale_factor: f64,
 }
 
 impl<T> GFT<T>
 where
-    T: Default + Seedable,
+    T: NoiseFn<f64, 2>,
 {
     pub const DEFAULT_OCTAVE_COUNT: usize = 6;
     pub const DEFAULT_FREQUENCY: f64 = 1.0;
@@ -27,16 +26,15 @@ where
     pub const DEFAULT_AMPLITUDE: f64 = 1.;
     pub const DEFAULT_SEED: u32 = 0;
 
-    pub fn new(seed: u32) -> Self {
+    pub fn new_with_source(source: T) -> Self {
         Self {
-            seed,
             octaves: Self::DEFAULT_OCTAVE_COUNT,
             frequency: Self::DEFAULT_FREQUENCY,
             lacunarity: Self::DEFAULT_LACUNARITY,
             persistence: Self::DEFAULT_PERSISTENCE,
             gradient: Self::DEFAULT_GRADIENT,
             amplitude: Self::DEFAULT_AMPLITUDE,
-            sources: build_sources(seed, Self::DEFAULT_OCTAVE_COUNT),
+            source: source,
             scale_factor: Self::calc_scale_factor(
                 Self::DEFAULT_PERSISTENCE,
                 Self::DEFAULT_OCTAVE_COUNT,
@@ -51,9 +49,16 @@ where
     }
 }
 
+impl<T> GFT<T>
+where T: NoiseFn<f64, 2> + Default + Seedable {
+    pub fn new(seed: u32) -> Self {
+        Self::new_with_source(T::default().set_seed(seed))
+    }
+}
+
 impl<T> Default for GFT<T>
 where
-    T: Default + Seedable,
+    T: Default + NoiseFn<f64, 2> + Seedable,
 {
     fn default() -> Self {
         Self::new(Self::DEFAULT_SEED)
@@ -62,7 +67,7 @@ where
 
 impl<T> MultiFractal for GFT<T>
 where
-    T: Default + Seedable,
+    T: NoiseFn<f64, 2>,
 {
     fn set_octaves(self, octaves: usize) -> Self {
         if self.octaves == octaves {
@@ -71,7 +76,6 @@ where
 
         Self {
             octaves,
-            sources: build_sources(self.seed, octaves),
             scale_factor: Self::calc_scale_factor(self.persistence, octaves),
             ..self
         }
@@ -103,8 +107,9 @@ impl<T> GFT<T> {
         Self { gradient, ..self }
     }
 
-    fn get_gradient_influence(&self, steepness: f64) -> f64 {
-        E.powf(-(steepness * self.gradient).powi(3))
+    fn get_gradient_influence(&self, flatness: f64) -> f64 {
+        //1. / (1. + (flatness * self.gradient))
+        (E * 0.375).powf(-(flatness * self.gradient).powi(2))
     }
 }
 
@@ -121,26 +126,26 @@ where
 
         let mut result = 0.0;
 
-        let mut total_derivative = Vector2::new(0., 0.);
+        let mut total_flatness = 0.;
 
         for x in 0..self.octaves as i32 {
             let frequency = self.frequency * self.lacunarity.powi(x);
-            let amplitude = self.amplitude * self.persistence.powi(x + 1);
+            let amplitude = self.amplitude * self.persistence.powi(x);
 
             // Get the signal.
-            let noise_value = self.sources[x as usize].get((point * frequency).into_array());
+            let noise_value = self.source.get((point * frequency).into_array());
             let noise_value_offset_x =
-                self.sources[x as usize].get((point * frequency + offset_x_point).into_array());
+                self.source.get((point * frequency + offset_x_point).into_array());
             let noise_value_offset_y =
-                self.sources[x as usize].get((point * frequency + offset_y_point).into_array());
+                self.source.get((point * frequency + offset_y_point).into_array());
 
-            total_derivative += Vector2::new(
+            let derivative = Vector2::new(
                 (noise_value_offset_x - noise_value) / derivative_offset,
                 (noise_value_offset_y - noise_value) / derivative_offset,
             );
-            let steepness = total_derivative.magnitude();
+            total_flatness += derivative.magnitude() * (1. / (x + 1) as f64);
 
-            let gradience = self.get_gradient_influence(steepness);
+            let gradience = self.get_gradient_influence(total_flatness);
 
             // Add the signal to the result.
             result += noise_value * gradience * amplitude;
@@ -149,16 +154,4 @@ where
         // Scale the result into the [-1,1] range
         result * self.scale_factor
     }
-}
-
-fn build_sources<Source>(seed: u32, octaves: usize) -> Vec<Source>
-where
-    Source: Default + Seedable,
-{
-    let mut sources = Vec::with_capacity(octaves);
-    for x in 0..octaves {
-        let source = Source::default();
-        sources.push(source.set_seed(seed + x as u32));
-    }
-    sources
 }

@@ -10,12 +10,14 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::IVec2;
 use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
-use noise::{Add, Clamp, Constant, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint};
+use noise::permutationtable::PermutationTable;
+use noise::{Add, Clamp, Constant, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 use std::usize;
 
+use super::noise::fractal_open_simplex::noise;
 use super::noise::gradient_fractal_noise::GFT;
 use super::noise::shift_n_scale::ShiftNScale;
 use super::voxel_types::VoxelData;
@@ -293,71 +295,77 @@ pub fn get_terrain_noise(
         Multiply::new(
             Add::new(
                 Add::new(
-                    Add::new(
-                        FractalOpenSimplex::new(
-                            rng.gen(),
-                            0.5f64.powi(10),
-                            256.,
-                            7,
-                            2.,
-                            0.5,
-                            Roughness::new(1, 0.5f64.powi(10), 0.2),
-                        ),
-                        Multiply::new(
-                            Multiply::new(
-                                Clamp::new(
-                                    ScalePoint::new(Perlin::new(rng.gen()))
-                                        .set_scale(0.5f64.powi(15)),
-                                )
-                                .set_bounds(0.1, 1.),
-                                // Clamp::new(Multiply::new(
-                                //     Add::new(
-                                //         Multiply::new(
-                                //             Turbulence::<Worley, Perlin>::new(
-                                //                 Worley::new(rng.gen())
-                                //                     .set_frequency(0.5f64.powi(13))
-                                //                     .set_distance_function(&euclidean_squared)
-                                //                     .set_return_type(ReturnType::Distance),
-                                //             )
-                                //             .set_frequency(0.5f64.powi(10))
-                                //             .set_power(300.)
-                                //             .set_roughness(5)
-                                //             .set_seed(rng.gen()),
-                                //             Constant::new(-1.),
-                                //         ),
-                                //         Constant::new(1.),
-                                //     ),
-                                //     Constant::new(0.5),
-                                // ))
-                                // .set_bounds(0., 1.),
+                    // Add::new(
+                    //     FractalOpenSimplex::new(
+                    //         rng.gen(),
+                    //         0.5f64.powi(10),
+                    //         256.,
+                    //         7,
+                    //         2.,
+                    //         0.5,
+                    //         Roughness::new(1, 0.5f64.powi(10), 0.2),
+                    //     ),
+                    //     Multiply::new(
+                    //         Multiply::new(
+                    //             Clamp::new(
+                    //                 ScalePoint::new(Perlin::new(rng.gen()))
+                    //                     .set_scale(0.5f64.powi(15)),
+                    //             )
+                    //             .set_bounds(0.1, 1.),
+                    //             // Clamp::new(Multiply::new(
+                    //             //     Add::new(
+                    //             //         Multiply::new(
+                    //             //             Turbulence::<Worley, Perlin>::new(
+                    //             //                 Worley::new(rng.gen())
+                    //             //                     .set_frequency(0.5f64.powi(13))
+                    //             //                     .set_distance_function(&euclidean_squared)
+                    //             //                     .set_return_type(ReturnType::Distance),
+                    //             //             )
+                    //             //             .set_frequency(0.5f64.powi(10))
+                    //             //             .set_power(300.)
+                    //             //             .set_roughness(5)
+                    //             //             .set_seed(rng.gen()),
+                    //             //             Constant::new(-1.),
+                    //             //         ),
+                    //             //         Constant::new(1.),
+                    //             //     ),
+                    //             //     Constant::new(0.5),
+                    //             // ))
+                    //             // .set_bounds(0., 1.),
 
-                                // FractalOpenSimplex::new(
-                                //     rng.gen(),
-                                //     0.5f64.powi(13),
-                                //     10000.,
-                                //     8,
-                                //     2.,
-                                //     0.5,
-                                //     Roughness::new(rng.gen(), 0.5f64.powi(13), 0.),
-                                // ),
-                                GFT::<ShiftNScale<Perlin, 1, 2>>::new(rng.gen())
-                                    .set_octaves(12)
-                                    .set_amplitude(7500.)
-                                    .set_frequency(0.5f64.powi(14))
-                                    .set_gradient(0.25),
-                            ),
-                            Constant::new(1.),
-                        ),
-                    ),
-                    FractalOpenSimplex::new(
-                        rng.gen(),
-                        0.5f64.powi(15),
-                        4096.,
-                        7,
-                        2.,
-                        0.5,
-                        Roughness::new(1, 0.5f64.powi(13), 0.2),
-                    ),
+                    //             // FractalOpenSimplex::new(
+                    //             //     rng.gen(),
+                    //             //     0.5f64.powi(13),
+                    //             //     10000.,
+                    //             //     8,
+                    //             //     2.,
+                    //             //     0.5,
+                    //             //     Roughness::new(rng.gen(), 0.5f64.powi(13), 0.),
+                    //             // ),
+                    //             GFT::<ShiftNScale<Perlin, 1, 2>>::new(rng.gen())
+                    //                 .set_octaves(12)
+                    //                 .set_amplitude(7500.)
+                    //                 .set_frequency(0.5f64.powi(14))
+                    //                 .set_gradient(0.25),
+                    //         ),
+                    //         Constant::new(1.),
+                    //     ),
+                    // ),
+                    Constant::new(0.),
+                    // FractalOpenSimplex::new(
+                    //     123,
+                    //     0.5f64.powi(14),
+                    //     8192.,
+                    //     1,
+                    //     2.,
+                    //     0.5,
+                    //     Roughness::new(1, 0.5f64.powi(13), 0.2),
+                    // ),
+                    GFT::new_with_source(noise::Max::new(noise::Add::new(ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())), Constant::new(-0.)), Constant::new(0.))) 
+                        .set_frequency(0.5f64.powi(14))
+                        .set_amplitude(7500.)
+                        .set_octaves(11)
+                        .set_gradient(1.),
                 ),
                 Constant::new(-1.),
             ),

@@ -48,7 +48,7 @@ impl<T: ShaderSize> IndexMut<usize> for Vec4<T> {
 
 pub type VoxelArray =
     [Vec4<u32>; ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4];
-pub type VoxelPalette = [Vec4<u32>; 8];
+pub type VoxelPalette = [Vec4<u32>; 64];
 
 pub struct VoxelData {
     pub array: VoxelArray,
@@ -61,7 +61,7 @@ impl Default for VoxelData {
         Self {
             array: [Vec4::<u32>::default();
                 ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4],
-            palette: [Vec4::<u32>::default(); 8],
+            palette: [Vec4::<u32>::default(); 64],
             block_map: Default::default(),
         }
     }
@@ -123,6 +123,9 @@ impl VoxelData {
         }
 
         let current_index = self.block_map.len() as u8 + 1;
+        // if current_index >= 32 {
+        //     return 31;
+        // }
 
         let color = block.get_color();
 

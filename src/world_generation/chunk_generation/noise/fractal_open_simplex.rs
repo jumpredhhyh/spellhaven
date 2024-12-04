@@ -21,8 +21,6 @@ impl<R> FractalOpenSimplex<R>
 where
     R: NoiseFn<f64, 2usize>,
 {
-    pub const DEFAULT_SEED: u32 = 0;
-
     pub fn new(
         seed: u32,
         frequency: f64,
