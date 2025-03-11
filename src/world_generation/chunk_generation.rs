@@ -15,7 +15,7 @@ use crate::world_generation::generation_options::{
 use crate::world_generation::voxel_world::{
     ChunkGenerationResult, ChunkLod, QuadTreeVoxelWorld, VoxelWorld, MAX_LOD,
 };
-use ::noise::NoiseFn;
+use ::noise::{Add, Constant, NoiseFn};
 use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub mod mesh_generation;
-mod noise;
+pub mod noise;
 pub mod voxel_generation;
 pub mod voxel_types;
 
@@ -166,16 +166,10 @@ fn start_chunk_tasks(
 
     for (entity, chunk_task_generator) in chunk_tasks_vec {
         let parent_pos = chunk_task_generator.0;
-        let country_pos = IVec2::new(
-            div_floor(
-                parent_pos.x,
-                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE as i32),
-            ),
-            div_floor(
-                parent_pos.y,
-                COUNTRY_SIZE as i32 / (MAX_LOD.multiplier_i32() * CHUNK_SIZE as i32),
-            ),
-        );
+        let country_pos = (parent_pos.as_vec2()
+            / (COUNTRY_SIZE as f32 / (MAX_LOD.multiplier_f32() * CHUNK_SIZE as f32)))
+            .floor()
+            .as_ivec2();
 
         match generation_options.1.get(&country_pos) {
             None => {
@@ -767,10 +761,10 @@ fn draw_path_gizmos(
         return;
     }
 
-    let terrain_noise = get_terrain_noise(ChunkLod::Full, &generation_options.0);
+    let terrain_noise = Add::new(get_terrain_noise(&generation_options.0), Constant::new(5.));
 
     for player in &players {
-        let player_country_pos = (player.translation * VOXEL_SIZE / COUNTRY_SIZE as f32)
+        let player_country_pos = (player.translation / VOXEL_SIZE / COUNTRY_SIZE as f32)
             .floor()
             .as_ivec3();
         let player_voxel_pos = (player.translation / VOXEL_SIZE).as_ivec3().xz();

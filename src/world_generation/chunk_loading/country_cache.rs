@@ -1,15 +1,18 @@
+use crate::world_generation::chunk_generation::noise::full_cache::FullCache;
+use crate::world_generation::chunk_generation::noise::lod_height_adjuster::LodHeightAdjuster;
 use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
 use crate::world_generation::chunk_generation::BlockType;
 use crate::world_generation::generation_options::{GenerationCacheItem, GenerationOptions};
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::log::info;
 use bevy::math::{IVec2, Vec2};
-use noise::NoiseFn;
+use noise::{Cache, NoiseFn};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Clone)]
 pub struct CountryCache {
@@ -260,7 +263,7 @@ impl GenerationCacheItem<IVec2> for PathCache {
             .structure_cache
             .get_cache_entry(right_country_pos, generation_options);
 
-        let path_finding_lod = ChunkLod::Sixtyfourth;
+        let path_finding_lod = ChunkLod::Sixteenth;
 
         Self {
             paths: vec![
@@ -300,7 +303,10 @@ impl PathCache {
         start_pos /= path_finding_lod.multiplier_i32();
         end_pos /= path_finding_lod.multiplier_i32();
 
-        let terrain_noise = get_terrain_noise(path_finding_lod, generation_options);
+        let terrain_noise = FullCache::new(LodHeightAdjuster::new(
+            get_terrain_noise(generation_options),
+            path_finding_lod,
+        ));
 
         let get_terrain_height = |pos: IVec2| -> f64 {
             terrain_noise.get(
@@ -357,6 +363,8 @@ impl PathCache {
 
         info!("start_pos: {start_pos}, end_pos: {end_pos}");
 
+        let now = Instant::now();
+
         while let Some(AStarCandidate {
             estimated_weight: _,
             real_weight,
@@ -379,15 +387,24 @@ impl PathCache {
                 let direction_difference = (direction - current_direction).abs();
                 let direction_cost = direction_difference.x + direction_difference.y;
 
+                let direction_turned = direction.perp();
+                let side_height_1 = get_terrain_height(next + direction_turned);
+                let side_height_2 = get_terrain_height(next - direction_turned);
+                let steepness = ((side_height_2 - side_height_1) / 2.).abs()
+                    / path_finding_lod.multiplier_i32() as f64;
+
                 let next_height = get_terrain_height(next);
 
                 let height_difference =
                     (current_height - next_height).abs() / path_finding_lod.multiplier_i32() as f64;
-                if height_difference > 0.55 || direction_cost > 1 {
+                if height_difference > 0.65 || direction_cost > 1 {
                     continue;
                 }
 
-                let real_weight = real_weight + weight + (height_difference * 20.) as i32; //((total_steepness * 0.6).max(0.) * 10.0) as i32;
+                let real_weight = real_weight
+                    + weight
+                    + (height_difference * 40.) as i32
+                    + (steepness * 20.) as i32; //((total_steepness * 0.6).max(0.) * 10.0) as i32;
                 if weights
                     .get(&next)
                     .map(|&weight| real_weight < weight)
@@ -406,7 +423,9 @@ impl PathCache {
             }
         }
 
-        info!("DONE");
+        let elapsed = now.elapsed();
+
+        info!("DONE: {}s", elapsed.as_secs_f32());
 
         if previous.get(&end_pos).is_some() {
             let mut min_x = 0;
@@ -498,4 +517,4 @@ impl PathCache {
     }
 }
 
-pub const COUNTRY_SIZE: usize = 2usize.pow(16);
+pub const COUNTRY_SIZE: usize = 2usize.pow(14);

@@ -6,7 +6,7 @@
 }
 
 struct TerrainMaterial {
-    palette: array<vec4<u32>, 64>,
+    palette: array<vec4<u32>, 128>,
     chunk_blocks: array<vec4<u32>, ((66 * 66 * 66 / 4 + 3) / 4)>,
     chunk_pos: vec3<i32>,
     chunk_lod: i32,

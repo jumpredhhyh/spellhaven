@@ -48,12 +48,12 @@ impl<T: ShaderSize> IndexMut<usize> for Vec4<T> {
 
 pub type VoxelArray =
     [Vec4<u32>; ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4];
-pub type VoxelPalette = [Vec4<u32>; 64];
+pub type VoxelPalette = [Vec4<u32>; 128];
 
 pub struct VoxelData {
     pub array: VoxelArray,
     pub palette: VoxelPalette,
-    block_map: HashMap<BlockType, u8>,
+    block_map: HashMap<BlockType, u16>,
 }
 
 impl Default for VoxelData {
@@ -61,7 +61,7 @@ impl Default for VoxelData {
         Self {
             array: [Vec4::<u32>::default();
                 ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4],
-            palette: [Vec4::<u32>::default(); 64],
+            palette: [Vec4::<u32>::default(); 128],
             block_map: Default::default(),
         }
     }
@@ -85,7 +85,7 @@ impl VoxelData {
 
         let mask: u32 = 0b11111111 << index_remainder;
 
-        let map_index = ((self.array[outer_index][divided_index] & mask) >> index_remainder) as u8;
+        let map_index = ((self.array[outer_index][divided_index] & mask) >> index_remainder) as u16;
 
         *self
             .block_map
@@ -113,7 +113,7 @@ impl VoxelData {
             previous | (palette_index.min(0xffu32) << (index_remainder * 8));
     }
 
-    fn get_palette_index(&mut self, block: BlockType) -> u8 {
+    fn get_palette_index(&mut self, block: BlockType) -> u16 {
         if block == BlockType::Air {
             return 0;
         }
@@ -122,7 +122,7 @@ impl VoxelData {
             return *palette_index;
         }
 
-        let current_index = self.block_map.len() as u8 + 1;
+        let current_index = self.block_map.len() as u16 + 1;
         // if current_index >= 32 {
         //     return 31;
         // }

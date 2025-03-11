@@ -1,31 +1,34 @@
 use crate::utils::div_floor;
-use crate::world_generation::chunk_generation::noise::fractal_open_simplex::FractalOpenSimplex;
-use crate::world_generation::chunk_generation::noise::roughness::Roughness;
 use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 use crate::world_generation::chunk_loading::country_cache::{
     CountryCache, Path, PathLine, COUNTRY_SIZE,
 };
 use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
-use bevy::math::IVec2;
+use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
-use bracket_noise::prelude::FastNoise;
-use noise::permutationtable::PermutationTable;
-use noise::{Add, Clamp, Constant, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable, Simplex};
+use fastnoise_lite::FastNoiseLite;
+use noise::{
+    Add, Constant, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable, Simplex, Worley,
+};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 use std::usize;
 
-use super::noise::fractal_open_simplex::noise;
+use super::noise::cellular_noise::Cellular;
+use super::noise::full_cache::FullCache;
 use super::noise::gradient_fractal_noise::GFT;
+use super::noise::lod_height_adjuster::LodHeightAdjuster;
 use super::noise::shift_n_scale::ShiftNScale;
+use super::noise::smooth_step::SmoothStep;
+use super::noise::steepness::Steepness;
 use super::voxel_types::VoxelData;
 
 pub struct StructureGenerator {
     pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
     pub model_size: [i32; 3],
-    pub noise: FastNoise,
+    pub noise: FastNoiseLite,
     pub generation_size: [i32; 2],
     pub grid_offset: [i32; 2],
     pub generate_debug_blocks: bool,
@@ -40,21 +43,19 @@ pub fn generate_voxels(
     country_cache: &CountryCache,
 ) -> (VoxelData, i32, bool) {
     let mut blocks = VoxelData::default();
-    //let value_noise = Fbm::<Perlin>::new(2).set_frequency(0.5f64.powi(12));
 
-    let terrain_noise = get_terrain_noise(chunk_lod, generation_options);
+    let terrain_noise = FullCache::new(LodHeightAdjuster::new(
+        get_terrain_noise(generation_options),
+        chunk_lod,
+    ));
+    let terrain_steepness = FullCache::new(Steepness::new(FullCache::new(get_terrain_noise(
+        generation_options,
+    ))));
 
-    let mut terrain_height = [[0f32; CHUNK_SIZE + 2]; CHUNK_SIZE + 2];
-    let mut terrain_steepness = [[0f32; CHUNK_SIZE]; CHUNK_SIZE];
-    get_noise_map(
-        IVec2::new(position[0], position[2]) * IVec2::new(CHUNK_SIZE as i32, CHUNK_SIZE as i32),
-        chunk_lod.multiplier_i32(),
-        &terrain_noise,
-        &mut terrain_height,
-    );
-    get_steepness_map(&mut terrain_steepness, &terrain_height);
+    let chunk_noise_offset = DVec2::new(position[0] as f64, position[2] as f64) * CHUNK_SIZE as f64;
 
-    let min_height = (get_min_in_noise_map(&terrain_height) as i32) - 2
+    let min_height = (get_min_in_noise_map(&terrain_noise, chunk_noise_offset, chunk_lod) as i32)
+        - 2
         + position[1] * CHUNK_SIZE as i32
         - 10 / chunk_lod.multiplier_i32();
 
@@ -71,16 +72,14 @@ pub fn generate_voxels(
             let total_x = position[0] * CHUNK_SIZE as i32 + x as i32 * chunk_lod.multiplier_i32();
             let total_z = position[2] * CHUNK_SIZE as i32 + z as i32 * chunk_lod.multiplier_i32();
 
+            let noise_position = [total_x as f64, total_z as f64];
+
             //let dryness = value_noise.get([total_x as f64, total_z as f64]);
             //let mountain = mountain_noise.get([total_x as f64, total_z as f64]);
 
-            let steepness = if x > 0 && z > 0 && x <= CHUNK_SIZE && z <= CHUNK_SIZE {
-                terrain_steepness[x - 1][z - 1]
-            } else {
-                0.
-            };
+            let steepness = terrain_steepness.get(noise_position);
 
-            let mut noise_height = terrain_height[x][z];
+            let mut noise_height = terrain_noise.get(noise_position) as f32;
 
             let is_snow = noise_height * chunk_lod.multiplier_f32() > 3500. / VOXEL_SIZE;
             let is_grass_steep = if is_snow {
@@ -128,6 +127,7 @@ pub fn generate_voxels(
                 }
                 blocks.set_block(
                     [x as i32, y as i32 - min_height, z as i32],
+                    // BlockType::Gray((biome_noise.get([total_x as f64, total_z as f64]) * 255.) as u8)
                     if is_path {
                         BlockType::Path
                     } else {
@@ -155,7 +155,7 @@ pub fn generate_voxels(
                 );
                 let structure_value = structure
                     .noise
-                    .get_noise(structure_offset_x as f32, structure_offset_z as f32)
+                    .get_noise_2d(structure_offset_x as f32, structure_offset_z as f32)
                     * 0.5
                     + 0.5;
                 if structure.generate_debug_blocks {
@@ -217,26 +217,27 @@ pub fn generate_voxels(
                         - structure.grid_offset[1]
                         + random_z;
 
+                    let structure_steepness = terrain_steepness.get([
+                        structure_noise_height_x as f64,
+                        structure_noise_height_z as f64,
+                    ]);
+
+                    if structure_steepness > 0.8 {
+                        continue;
+                    }
+
                     let structure_center: IVec2 =
                         [structure_noise_height_x, structure_noise_height_z].into();
 
-                    let country_bounds_check =
-                        structure_center - country_cache.country_pos * COUNTRY_SIZE as i32;
-                    if country_bounds_check.x >= 0
-                        && country_bounds_check.y >= 0
-                        && country_bounds_check.x < COUNTRY_SIZE as i32 - 1
-                        && country_bounds_check.y < COUNTRY_SIZE as i32 - 1
-                    {
-                        let (a, _, _, _) = get_min_distance_to_path(
-                            structure_center,
-                            &all_paths,
-                            IVec2::new(structure.model_size[0] / 2, structure.model_size[2] / 2)
-                                + IVec2::ONE * 10,
-                        );
+                    let (a, _, _, _) = get_min_distance_to_path(
+                        structure_center,
+                        &all_paths,
+                        IVec2::new(structure.model_size[0] / 2, structure.model_size[2] / 2)
+                            + IVec2::ONE * 10,
+                    );
 
-                        if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
-                            continue;
-                        }
+                    if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
+                        continue;
                     }
 
                     let noise_height = terrain_noise.get([
@@ -285,93 +286,51 @@ pub fn generate_voxels(
     (blocks, min_height, generate_more)
 }
 
-pub fn get_terrain_noise(
-    chunk_lod: ChunkLod,
-    generation_options: &GenerationOptions,
-) -> impl NoiseFn<f64, 2usize> {
+pub fn get_mountain_biome_noise(generation_options: &GenerationOptions) -> impl NoiseFn<f64, 2> {
+    let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
+    Multiply::new(
+        SmoothStep::new(Multiply::new(
+            Add::new(
+                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(16)),
+                Constant::new(1.),
+            ),
+            Constant::new(0.5),
+        ))
+        .set_steps(4.)
+        .set_smoothness(0.5),
+        GFT::new_with_source(noise::Max::new(
+            noise::Add::new(
+                ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())),
+                Constant::new(-0.),
+            ),
+            Constant::new(0.),
+        ))
+        .set_frequency(0.5f64.powi(14))
+        .set_amplitude(7500.)
+        .set_octaves(11)
+        .set_gradient(1.),
+    )
+}
+
+pub fn get_terrain_noise(generation_options: &GenerationOptions) -> impl NoiseFn<f64, 2> {
     let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
 
     Add::new(
-        Multiply::new(
-            Add::new(
-                Add::new(
-                    // Add::new(
-                    //     FractalOpenSimplex::new(
-                    //         rng.gen(),
-                    //         0.5f64.powi(10),
-                    //         256.,
-                    //         7,
-                    //         2.,
-                    //         0.5,
-                    //         Roughness::new(1, 0.5f64.powi(10), 0.2),
-                    //     ),
-                    //     Multiply::new(
-                    //         Multiply::new(
-                    //             Clamp::new(
-                    //                 ScalePoint::new(Perlin::new(rng.gen()))
-                    //                     .set_scale(0.5f64.powi(15)),
-                    //             )
-                    //             .set_bounds(0.1, 1.),
-                    //             // Clamp::new(Multiply::new(
-                    //             //     Add::new(
-                    //             //         Multiply::new(
-                    //             //             Turbulence::<Worley, Perlin>::new(
-                    //             //                 Worley::new(rng.gen())
-                    //             //                     .set_frequency(0.5f64.powi(13))
-                    //             //                     .set_distance_function(&euclidean_squared)
-                    //             //                     .set_return_type(ReturnType::Distance),
-                    //             //             )
-                    //             //             .set_frequency(0.5f64.powi(10))
-                    //             //             .set_power(300.)
-                    //             //             .set_roughness(5)
-                    //             //             .set_seed(rng.gen()),
-                    //             //             Constant::new(-1.),
-                    //             //         ),
-                    //             //         Constant::new(1.),
-                    //             //     ),
-                    //             //     Constant::new(0.5),
-                    //             // ))
-                    //             // .set_bounds(0., 1.),
-
-                    //             // FractalOpenSimplex::new(
-                    //             //     rng.gen(),
-                    //             //     0.5f64.powi(13),
-                    //             //     10000.,
-                    //             //     8,
-                    //             //     2.,
-                    //             //     0.5,
-                    //             //     Roughness::new(rng.gen(), 0.5f64.powi(13), 0.),
-                    //             // ),
-                    //             GFT::<ShiftNScale<Perlin, 1, 2>>::new(rng.gen())
-                    //                 .set_octaves(12)
-                    //                 .set_amplitude(7500.)
-                    //                 .set_frequency(0.5f64.powi(14))
-                    //                 .set_gradient(0.25),
-                    //         ),
-                    //         Constant::new(1.),
-                    //     ),
-                    // ),
-                    Constant::new(0.),
-                    // FractalOpenSimplex::new(
-                    //     123,
-                    //     0.5f64.powi(14),
-                    //     8192.,
-                    //     1,
-                    //     2.,
-                    //     0.5,
-                    //     Roughness::new(1, 0.5f64.powi(13), 0.2),
-                    // ),
-                    GFT::new_with_source(noise::Max::new(noise::Add::new(ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())), Constant::new(-0.)), Constant::new(0.))) 
-                        .set_frequency(0.5f64.powi(14))
-                        .set_amplitude(7500.)
-                        .set_octaves(11)
-                        .set_gradient(1.),
+        Add::new(
+            get_mountain_biome_noise(generation_options),
+            GFT::new_with_source(noise::Max::new(
+                noise::Add::new(
+                    ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())),
+                    Constant::new(-0.),
                 ),
-                Constant::new(-1.),
-            ),
-            Constant::new(1. / chunk_lod.multiplier_f32() as f64),
+                Constant::new(0.),
+            ))
+            .set_frequency(0.5f64.powi(14))
+            .set_amplitude(1000.)
+            .set_octaves(11)
+            .set_gradient(1.),
         ),
-        Constant::new(1. + 10. / chunk_lod.multiplier_i32() as f64),
+        Constant::new(-1.),
     )
 }
 
@@ -402,12 +361,19 @@ pub fn get_steepness_map<const SIZE: usize, const SIZE2: usize>(
     }
 }
 
-fn get_min_in_noise_map<const SIZE: usize, T: PartialOrd + Copy>(map: &[[T; SIZE]; SIZE]) -> T {
-    let mut min = map[0][0];
+fn get_min_in_noise_map(
+    noise: &impl NoiseFn<f64, 2usize>,
+    chunk_offset: DVec2,
+    chunk_lod: ChunkLod,
+) -> f64 {
+    let mut min = noise.get(chunk_offset.to_array());
 
-    for x in 0..SIZE {
-        for z in 0..SIZE {
-            let current = map[x][z];
+    for x in 0..CHUNK_SIZE {
+        for z in 0..CHUNK_SIZE {
+            let current = noise.get([
+                x as f64 * chunk_lod.multiplier_i32() as f64 + chunk_offset.x,
+                z as f64 * chunk_lod.multiplier_i32() as f64 + chunk_offset.y,
+            ]);
             if current < min {
                 min = current;
             }

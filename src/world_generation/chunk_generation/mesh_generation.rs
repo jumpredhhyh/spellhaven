@@ -18,7 +18,6 @@ pub fn generate_mesh(
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
     let mut triangles: Vec<[u32; 3]> = Vec::new();
-    // let mut colors: Vec<[f32; 4]> = Vec::new();
 
     fn rotate_into_direction<T: Vec3Swizzles + Neg<Output = T>>(vector: T, direction: IVec3) -> T {
         match direction {

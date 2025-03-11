@@ -4,8 +4,7 @@ use crate::world_generation::chunk_loading::country_cache::{
     CountryCache, PathCache, StructureCache,
 };
 use bevy::prelude::{IVec2, Resource};
-use bracket_noise::prelude::FastNoise;
-use bracket_noise::prelude::NoiseType::WhiteNoise;
+use fastnoise_lite::FastNoiseLite;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
@@ -75,10 +74,10 @@ impl Default for GenerationOptionsResource {
     }
 }
 
-fn get_seeded_white_noise(seed: u64) -> FastNoise {
-    let mut noise = FastNoise::seeded(seed);
-    noise.set_noise_type(WhiteNoise);
-    noise.set_frequency(0.1);
+fn get_seeded_white_noise(seed: u64) -> FastNoiseLite {
+    let mut noise = FastNoiseLite::with_seed(seed as i32);
+    noise.set_noise_type(Some(fastnoise_lite::NoiseType::Value));
+    noise.set_frequency(Some(0.1));
     noise
 }
 
