@@ -42,7 +42,7 @@ pub struct ChunkTaskData {
 pub enum BlockType {
     Air,
     Stone,
-    Grass,
+    Grass(u8),
     Sand,
     Path,
     Snow,
@@ -56,7 +56,10 @@ impl BlockType {
         match self {
             BlockType::Air => [0., 0., 0., 0.],
             BlockType::Stone => [150. / 255., 160. / 255., 155. / 255., 1.],
-            BlockType::Grass => [55. / 255., 195. / 255., 95. / 255., 1.],
+            BlockType::Grass(hue_offset) => {
+                let color = Color::hsl(150. - (*hue_offset as f32 / 2.), 0.56, 0.49);
+                color.rgba_to_vec4().to_array()
+            }
             BlockType::Gray(value) => [
                 *value as f32 / 255.,
                 *value as f32 / 255.,

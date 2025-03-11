@@ -6,7 +6,7 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
 use fastnoise_lite::FastNoiseLite;
-use noise::{Add, Constant, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
+use noise::{Add, Constant, Exponent, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
@@ -47,6 +47,8 @@ pub fn generate_voxels(
         generation_options,
     ))));
 
+    let grass_color_noise = FullCache::new(get_grass_color_noise(generation_options));
+
     let chunk_noise_offset = DVec2::new(position[0] as f64, position[2] as f64) * CHUNK_SIZE as f64;
 
     let min_height = (get_min_in_noise_map(&terrain_noise, chunk_noise_offset, chunk_lod) as i32)
@@ -75,6 +77,8 @@ pub fn generate_voxels(
             let steepness = terrain_steepness.get(noise_position);
 
             let mut noise_height = terrain_noise.get(noise_position) as f32;
+
+            let grass_color = (grass_color_noise.get(noise_position) * 255.) as u8;
 
             let is_snow = noise_height * chunk_lod.multiplier_f32() > 3500. / VOXEL_SIZE;
             let is_grass_steep = if is_snow {
@@ -130,7 +134,7 @@ pub fn generate_voxels(
                             if is_snow {
                                 BlockType::Snow
                             } else {
-                                BlockType::Grass
+                                BlockType::Grass(grass_color)
                             }
                         } else {
                             BlockType::Stone
@@ -281,8 +285,24 @@ pub fn generate_voxels(
     (blocks, min_height, generate_more)
 }
 
+pub fn get_grass_color_noise(generation_options: &GenerationOptions) -> impl NoiseFn<f64, 2> {
+    let mut rng = StdRng::seed_from_u64(generation_options.seed + 3);
+    SmoothStep::new(
+        Exponent::new(Multiply::new(
+            Add::new(
+                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(14)),
+                Constant::new(1.),
+            ),
+            Constant::new(0.5),
+        ))
+        .set_exponent(2.),
+    )
+    .set_steps(6.)
+    .set_smoothness(0.5)
+}
+
 pub fn get_mountain_biome_noise(generation_options: &GenerationOptions) -> impl NoiseFn<f64, 2> {
-    let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
+    let mut rng = StdRng::seed_from_u64(generation_options.seed + 2);
     Multiply::new(
         SmoothStep::new(Multiply::new(
             Add::new(
