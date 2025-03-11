@@ -387,23 +387,26 @@ impl PathCache {
                 let direction_difference = (direction - current_direction).abs();
                 let direction_cost = direction_difference.x + direction_difference.y;
 
-                let direction_turned = direction.perp();
-                let side_height_1 = get_terrain_height(next + direction_turned);
-                let side_height_2 = get_terrain_height(next - direction_turned);
-                let steepness = ((side_height_2 - side_height_1) / 2.).abs()
-                    / path_finding_lod.multiplier_i32() as f64;
+                if direction_cost > 1 {
+                    continue;
+                }
 
                 let next_height = get_terrain_height(next);
 
                 let height_difference =
                     (current_height - next_height).abs() / path_finding_lod.multiplier_i32() as f64;
-                if height_difference > 0.65 || direction_cost > 1 {
+                if height_difference > 0.65 {
                     continue;
                 }
 
+                let direction_turned = direction.perp();
+                let side_height = get_terrain_height(next + direction_turned);
+                let steepness =
+                    (next_height - side_height).abs() / path_finding_lod.multiplier_i32() as f64;
+
                 let real_weight = real_weight
                     + weight
-                    + (height_difference * 40.) as i32
+                    + (height_difference * 30.) as i32
                     + (steepness * 20.) as i32; //((total_steepness * 0.6).max(0.) * 10.0) as i32;
                 if weights
                     .get(&next)
