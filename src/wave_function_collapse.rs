@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use bevy::{
     app::{Plugin, Startup},
@@ -7,7 +7,6 @@ use bevy::{
         component::Component,
         entity::Entity,
         system::{Commands, Res, ResMut},
-        world::World,
     },
     math::{IVec2, Vec2, Vec3},
     prelude::default,
@@ -56,18 +55,18 @@ fn startup(
         }
     }
 
-    commands.spawn(WfcTilemap { tiles: hash });
+    commands.spawn(WfcTilemap { _tiles: hash });
 }
 
 #[derive(Component)]
 struct WfcTile {
-    position: IVec2,
-    state: Flags,
+    _position: IVec2,
+    _state: Flags,
 }
 
 #[derive(Component)]
 struct WfcTilemap {
-    tiles: HashMap<IVec2, Entity>,
+    _tiles: HashMap<IVec2, Entity>,
 }
 
 fn spawn_sprite(
@@ -93,8 +92,8 @@ fn spawn_sprite(
             index: index,
         },
         WfcTile {
-            position,
-            state: Flags::all(),
+            _position: position,
+            _state: Flags::all(),
         },
     ));
 
@@ -129,53 +128,91 @@ bitflags! {
 }
 
 impl WfcTile {
-    fn remove_state(&mut self, state_to_remove: Flags, bitmap: &mut HashMap<IVec2, &mut WfcTile>) {
-        let removed_state = self.state & state_to_remove;
-        self.state &= !state_to_remove;
+    fn _remove_state(
+        &mut self,
+        state_to_remove: Flags,
+        bitmap: Rc<RefCell<HashMap<IVec2, RefCell<WfcTile>>>>,
+    ) {
+        let removed_state = self._state & state_to_remove;
+        self._state &= !state_to_remove;
 
         for set_flag in removed_state {
-            // match set_flag {
-            //     Flags::Barrel => {
-            //         bitmap.entry(self.position - IVec2::Y).and_modify(move |f| {
-            //             f.remove_state(!(Flags::FloorTL | Flags::FloorTM | Flags::FloorTR), bitmap)
-            //         });
-            //     }
-            //     Flags::BarrelBroken => {
-            //         bitmap.entry(self.position - IVec2::Y).and_modify(|f| {
-            //             f.state &= Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
-            //         });
-            //     }
-            //     Flags::PoleTop => {
-            //         bitmap
-            //             .entry(self.position - IVec2::Y)
-            //             .and_modify(|f| f.state &= Flags::PoleMiddle | Flags::PoleBottom);
-            //     }
-            //     Flags::PoleMiddle => {
-            //         bitmap
-            //             .entry(self.position - IVec2::Y)
-            //             .and_modify(|f| f.state &= Flags::PoleMiddle | Flags::PoleBottom);
-            //         bitmap
-            //             .entry(self.position + IVec2::Y)
-            //             .and_modify(|f| f.state &= Flags::PoleTop);
-            //     }
-            //     Flags::PoleBottom => {
-            //         bitmap.entry(self.position - IVec2::Y).and_modify(|f| {
-            //             f.state &= Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
-            //         });
-            //         bitmap
-            //             .entry(self.position + IVec2::Y)
-            //             .and_modify(|f| f.state &= Flags::PoleTop | Flags::PoleMiddle);
-            //     }
-            //     Flags::FloorTL => {
-            //         bitmap.entry(self.position - IVec2::Y).and_modify(|f| {
-            //             f.state &= Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
-            //         });
-            //         bitmap
-            //             .entry(self.position + IVec2::Y)
-            //             .and_modify(|f| f.state &= Flags::PoleTop | Flags::PoleMiddle);
-            //     }
-            //     _ => {}
-            // }
+            let cloned_bimap = bitmap.clone();
+
+            match set_flag {
+                Flags::Barrel => {
+                    bitmap
+                        .clone()
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(move |f| {
+                            f.borrow_mut()._remove_state(
+                                !(Flags::FloorTL | Flags::FloorTM | Flags::FloorTR),
+                                cloned_bimap,
+                            )
+                        });
+                }
+                Flags::BarrelBroken => {
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &=
+                                Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
+                        });
+                }
+                Flags::PoleTop => {
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &= Flags::PoleMiddle | Flags::PoleBottom
+                        });
+                }
+                Flags::PoleMiddle => {
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &= Flags::PoleMiddle | Flags::PoleBottom
+                        });
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position + IVec2::Y)
+                        .and_modify(|f| f.borrow_mut()._state &= Flags::PoleTop);
+                }
+                Flags::PoleBottom => {
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &=
+                                Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
+                        });
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position + IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &= Flags::PoleTop | Flags::PoleMiddle
+                        });
+                }
+                Flags::FloorTL => {
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position - IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &=
+                                Flags::FloorTL | Flags::FloorTM | Flags::FloorTR
+                        });
+                    bitmap
+                        .borrow_mut()
+                        .entry(self._position + IVec2::Y)
+                        .and_modify(|f| {
+                            f.borrow_mut()._state &= Flags::PoleTop | Flags::PoleMiddle
+                        });
+                }
+                _ => {}
+            }
         }
     }
 }

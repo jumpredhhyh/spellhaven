@@ -1,7 +1,6 @@
 use crate::debug_tools::debug_resource::SpellhavenDebug;
 use crate::player::Player;
 use crate::terrain_material::TerrainMaterial;
-use crate::utils::div_floor;
 use crate::world_generation::chunk_generation::voxel_generation::get_terrain_noise;
 use crate::world_generation::chunk_loading::chunk_loader::{
     get_chunk_position, ChunkLoader, ChunkLoaderPlugin,

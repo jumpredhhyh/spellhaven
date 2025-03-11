@@ -61,7 +61,9 @@ impl GenerationOptionsResource {
                         debug_rgb_multiplier: [1., 1., 1.],
                     },
                 ],
-                structure_assets: vec![StructureAsset((*box_structure.0).clone())],
+                structure_assets: vec![StructureAsset {
+                    _blocks: (*box_structure.0).clone(),
+                }],
             }),
             1: HashMap::new(),
         }
@@ -173,7 +175,9 @@ impl<K: Copy + Eq + Hash, T: GenerationCacheItem<K>> GenerationCache<K, T> {
     }
 }
 
-pub struct StructureAsset(Vec<Vec<Vec<BlockType>>>);
+pub struct StructureAsset {
+    pub _blocks: Vec<Vec<Vec<BlockType>>>,
+}
 
 fn vox_data_to_blocks(vox_data: &VoxData) -> Vec<Vec<Vec<BlockType>>> {
     let model = vox_data.models.first().unwrap();

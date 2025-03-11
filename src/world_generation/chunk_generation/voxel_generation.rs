@@ -1,22 +1,17 @@
 use crate::utils::div_floor;
 use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
-use crate::world_generation::chunk_loading::country_cache::{
-    CountryCache, Path, PathLine, COUNTRY_SIZE,
-};
+use crate::world_generation::chunk_loading::country_cache::{CountryCache, Path, PathLine};
 use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
 use fastnoise_lite::FastNoiseLite;
-use noise::{
-    Add, Constant, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable, Simplex, Worley,
-};
+use noise::{Add, Constant, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 use std::usize;
 
-use super::noise::cellular_noise::Cellular;
 use super::noise::full_cache::FullCache;
 use super::noise::gradient_fractal_noise::GFT;
 use super::noise::lod_height_adjuster::LodHeightAdjuster;

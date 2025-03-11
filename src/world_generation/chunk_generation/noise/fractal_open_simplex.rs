@@ -100,7 +100,7 @@ pub fn fractal_noise(
     hasher: &PermutationTable,
 ) -> f64 {
     let mut noise_value: f64 = 0.;
-    let mut total_flatness: f64 = 0.;
+    let mut _total_flatness: f64 = 0.;
 
     for octave in 0..octaves {
         let result = noise(
@@ -111,7 +111,7 @@ pub fn fractal_noise(
             hasher,
         );
         let flatness = result.1[0].abs() + result.1[1].abs();
-        total_flatness += flatness;
+        _total_flatness += flatness;
         noise_value += result.0; // * (1. / (1. + total_flatness));
     }
 

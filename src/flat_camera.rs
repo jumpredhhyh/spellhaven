@@ -1,6 +1,6 @@
 use bevy::{
     app::{Plugin, Startup, Update},
-    core_pipeline::core_2d::{Camera2d, Camera2dBundle},
+    core_pipeline::core_2d::Camera2dBundle,
     ecs::{
         component::Component,
         event::EventReader,
@@ -12,9 +12,8 @@ use bevy::{
         ButtonInput,
     },
     math::Vec3,
-    render::camera::{self, OrthographicProjection},
+    render::camera::OrthographicProjection,
     transform::components::Transform,
-    utils::info,
 };
 
 pub struct FlatCameraPlugin;

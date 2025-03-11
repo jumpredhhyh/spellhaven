@@ -6,7 +6,7 @@ use crate::world_generation::generation_options::{GenerationCacheItem, Generatio
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::log::info;
 use bevy::math::{IVec2, Vec2};
-use noise::{Cache, NoiseFn};
+use noise::NoiseFn;
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::cmp::Ordering;
