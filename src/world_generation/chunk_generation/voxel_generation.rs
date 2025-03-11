@@ -6,7 +6,7 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
 use fastnoise_lite::FastNoiseLite;
-use noise::{Add, Constant, Exponent, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
+use noise::{Add, Constant, Exponent, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
@@ -287,16 +287,22 @@ pub fn generate_voxels(
 
 pub fn get_grass_color_noise(generation_options: &GenerationOptions) -> impl NoiseFn<f64, 2> {
     let mut rng = StdRng::seed_from_u64(generation_options.seed + 3);
-    SmoothStep::new(
-        Exponent::new(Multiply::new(
+    SmoothStep::new(Min::new(
+        Multiply::new(
             Add::new(
                 ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(14)),
                 Constant::new(1.),
             ),
             Constant::new(0.5),
-        ))
-        .set_exponent(2.),
-    )
+        ),
+        Multiply::new(
+            Add::new(
+                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(14)),
+                Constant::new(1.),
+            ),
+            Constant::new(0.5),
+        ),
+    ))
     .set_steps(6.)
     .set_smoothness(0.5)
 }
