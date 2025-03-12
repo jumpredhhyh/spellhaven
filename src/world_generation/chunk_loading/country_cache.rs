@@ -203,11 +203,11 @@ impl Ord for AStarCandidate {
 
 impl GenerationCacheItem<IVec2> for CountryCache {
     fn generate(key: IVec2, generation_options: &GenerationOptions) -> Self {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         Self {
             country_pos: key,
-            grass_color: BlockType::Custom(rng.gen(), rng.gen(), rng.gen()),
+            grass_color: BlockType::Custom(rng.random(), rng.random(), rng.random()),
             structure_cache: generation_options
                 .structure_cache
                 .get_cache_entry(key, generation_options),
@@ -232,15 +232,15 @@ impl GenerationCacheItem<IVec2> for StructureCache {
             generation_options.seed.wrapping_add(key.x.abs() as u64)
         });
         let mut rng = StdRng::seed_from_u64(if key.x < 0 {
-            rng.gen::<u64>().wrapping_sub(key.y.abs() as u64)
+            rng.random::<u64>().wrapping_sub(key.y.abs() as u64)
         } else {
-            rng.gen::<u64>().wrapping_add(key.y.abs() as u64)
+            rng.random::<u64>().wrapping_add(key.y.abs() as u64)
         });
 
         let min_offset = 100i32;
 
-        let city_x = rng.gen_range(min_offset..COUNTRY_SIZE as i32 - min_offset);
-        let city_z = rng.gen_range(min_offset..COUNTRY_SIZE as i32 - min_offset);
+        let city_x = rng.random_range(min_offset..COUNTRY_SIZE as i32 - min_offset);
+        let city_z = rng.random_range(min_offset..COUNTRY_SIZE as i32 - min_offset);
 
         Self {
             city_location: IVec2::new(city_x, city_z) + key * COUNTRY_SIZE as i32,

@@ -2,16 +2,15 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use bevy::{
     app::{Plugin, Startup},
-    asset::{AssetServer, Assets, Handle},
+    asset::{Assets, Handle},
     ecs::{
         component::Component,
         entity::Entity,
-        system::{Commands, Res, ResMut},
+        system::{Commands, ResMut},
     },
-    math::{IVec2, Vec2, Vec3},
+    math::{IVec2, UVec2, Vec3},
     prelude::default,
-    render::texture::Image,
-    sprite::{SpriteBundle, TextureAtlas, TextureAtlasLayout},
+    sprite::{Sprite, TextureAtlas, TextureAtlasLayout},
     transform::components::Transform,
 };
 
@@ -26,11 +25,11 @@ impl Plugin for WaveFunctionCollapsePlugin {
 
 fn startup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    //asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlasLayout>>,
 ) {
-    let texture_handle: Handle<Image> = asset_server.load("wfc_2d/cave_tileset.png");
-    let texture_atlas = TextureAtlasLayout::from_grid(Vec2::new(32.0, 32.0), 10, 7, None, None);
+    //let texture_handle: Handle<Image> = asset_server.load("wfc_2d/cave_tileset.png");
+    let texture_atlas = TextureAtlasLayout::from_grid(UVec2::new(32, 32), 10, 7, None, None);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
     let indicies = [
@@ -46,7 +45,6 @@ fn startup(
         for (x, j) in i.iter().enumerate() {
             spawn_sprite(
                 &mut commands,
-                &texture_handle,
                 &texture_atlas_handle,
                 *j,
                 IVec2::new(x as i32 * 64, -(y as i32 * 64)),
@@ -71,25 +69,23 @@ struct WfcTilemap {
 
 fn spawn_sprite(
     commands: &mut Commands,
-    texture: &Handle<Image>,
     texture_atlas_handle: &Handle<TextureAtlasLayout>,
     index: usize,
     position: IVec2,
     tile_map: &mut HashMap<IVec2, Entity>,
 ) {
     let entity = commands.spawn((
-        SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(position.x as f32, position.y as f32, 0.),
-                scale: Vec3::splat(2.0),
-                ..default()
-            },
-            texture: texture.clone(),
+        Sprite {
+            texture_atlas: Some(TextureAtlas {
+                layout: texture_atlas_handle.clone(),
+                index: index,
+            }),
             ..default()
         },
-        TextureAtlas {
-            layout: texture_atlas_handle.clone(),
-            index: index,
+        Transform {
+            translation: Vec3::new(position.x as f32, position.y as f32, 0.),
+            scale: Vec3::splat(2.0),
+            ..default()
         },
         WfcTile {
             _position: position,

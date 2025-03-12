@@ -6,7 +6,7 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
 use fastnoise_lite::FastNoiseLite;
-use noise::{Add, Constant, Exponent, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
+use noise::{Add, Constant, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::sync::Arc;
@@ -183,10 +183,10 @@ pub fn generate_voxels(
                 let mut rand = StdRng::seed_from_u64((structure_value.abs() * 10000.) as u64);
 
                 if structure_value > 0. {
-                    let random_x =
-                        rand.gen_range(0..=structure.generation_size[0] - structure.model_size[0]);
-                    let random_z =
-                        rand.gen_range(0..=structure.generation_size[1] - structure.model_size[2]);
+                    let random_x = rand
+                        .random_range(0..=structure.generation_size[0] - structure.model_size[0]);
+                    let random_z = rand
+                        .random_range(0..=structure.generation_size[1] - structure.model_size[2]);
 
                     let structure_x: i32 = (total_x + structure.grid_offset[0]
                         - structure_offset_x * structure.generation_size[0])
@@ -290,14 +290,14 @@ pub fn get_grass_color_noise(generation_options: &GenerationOptions) -> impl Noi
     SmoothStep::new(Min::new(
         Multiply::new(
             Add::new(
-                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(14)),
+                ScalePoint::new(Simplex::new(rng.random())).set_scale(0.5f64.powi(14)),
                 Constant::new(1.),
             ),
             Constant::new(0.5),
         ),
         Multiply::new(
             Add::new(
-                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(14)),
+                ScalePoint::new(Simplex::new(rng.random())).set_scale(0.5f64.powi(14)),
                 Constant::new(1.),
             ),
             Constant::new(0.5),
@@ -312,7 +312,7 @@ pub fn get_mountain_biome_noise(generation_options: &GenerationOptions) -> impl 
     Multiply::new(
         SmoothStep::new(Multiply::new(
             Add::new(
-                ScalePoint::new(Simplex::new(rng.gen())).set_scale(0.5f64.powi(16)),
+                ScalePoint::new(Simplex::new(rng.random())).set_scale(0.5f64.powi(16)),
                 Constant::new(1.),
             ),
             Constant::new(0.5),
@@ -321,7 +321,7 @@ pub fn get_mountain_biome_noise(generation_options: &GenerationOptions) -> impl 
         .set_smoothness(0.5),
         GFT::new_with_source(noise::Max::new(
             noise::Add::new(
-                ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())),
+                ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.random())),
                 Constant::new(-0.),
             ),
             Constant::new(0.),
@@ -341,7 +341,7 @@ pub fn get_terrain_noise(generation_options: &GenerationOptions) -> impl NoiseFn
             get_mountain_biome_noise(generation_options),
             GFT::new_with_source(noise::Max::new(
                 noise::Add::new(
-                    ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.gen())),
+                    ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.random())),
                     Constant::new(-0.),
                 ),
                 Constant::new(0.),

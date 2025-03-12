@@ -15,6 +15,7 @@ use crate::world_generation::voxel_world::{
     ChunkGenerationResult, ChunkLod, QuadTreeVoxelWorld, VoxelWorld, MAX_LOD,
 };
 use ::noise::{Add, Constant, NoiseFn};
+use bevy::math::Vec3A;
 use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::tasks::{Task, TaskPool, TaskPoolBuilder};
@@ -58,7 +59,7 @@ impl BlockType {
             BlockType::Stone => [150. / 255., 160. / 255., 155. / 255., 1.],
             BlockType::Grass(hue_offset) => {
                 let color = Color::hsl(150. - (*hue_offset as f32 / 2.), 0.56, 0.49);
-                color.rgba_to_vec4().to_array()
+                color.to_srgba().to_f32_array()
             }
             BlockType::Gray(value) => [
                 *value as f32 / 255.,
@@ -346,7 +347,9 @@ fn generate_quad_tree_chunk(
         ))
         .id();
 
-    commands.entity(owner).insert(SpatialBundle::default());
+    commands
+        .entity(owner)
+        .insert((Transform::default(), Visibility::default()));
 
     commands.entity(owner).add_child(child);
 
@@ -696,21 +699,18 @@ fn set_generated_chunks(
                         triangle_count as u64;
 
                     current_entity.remove::<ChunkGenerationTask>().insert((
-                        MaterialMeshBundle {
-                            mesh: meshes.add(chunk_task_data.mesh),
-                            material: materials.add(ExtendedMaterial {
-                                base: Color::WHITE.into(),
-                                extension: TerrainMaterial {
-                                    chunk_blocks: chunk_generation_result.voxel_data.array,
-                                    palette: chunk_generation_result.voxel_data.palette,
-                                    chunk_pos: chunk_generation_result.chunk_pos,
-                                    chunk_lod: chunk_generation_result.lod.multiplier_i32(),
-                                    min_chunk_height: chunk_generation_result.min_height,
-                                },
-                            }),
-                            transform: chunk_task_data.transform,
-                            ..default()
-                        },
+                        chunk_task_data.transform,
+                        Mesh3d(meshes.add(chunk_task_data.mesh)),
+                        MeshMaterial3d(materials.add(ExtendedMaterial {
+                            base: Color::WHITE.into(),
+                            extension: TerrainMaterial {
+                                chunk_blocks: chunk_generation_result.voxel_data.array,
+                                palette: chunk_generation_result.voxel_data.palette,
+                                chunk_pos: chunk_generation_result.chunk_pos,
+                                chunk_lod: chunk_generation_result.lod.multiplier_i32(),
+                                min_chunk_height: chunk_generation_result.min_height,
+                            },
+                        })),
                         Chunk([
                             chunk_generation_result.parent_pos[0],
                             chunk_generation_result.chunk_height,
@@ -793,9 +793,9 @@ fn draw_path_gizmos(
                                     let is_in_path =
                                         path_line.is_in_box(player_voxel_pos, IVec2::ONE * 5);
                                     let color = if is_in_path {
-                                        Color::ORANGE
+                                        Color::srgb(229. / 255., 171. / 255., 0.)
                                     } else {
-                                        Color::GREEN
+                                        Color::srgb(0., 200. / 255., 0.)
                                     };
                                     gizmos.line(
                                         Vec3::from((
@@ -816,56 +816,66 @@ fn draw_path_gizmos(
                                     );
                                     if is_in_path {
                                         gizmos.circle(
-                                            Vec3::from((
-                                                path_line.spline_one,
-                                                terrain_noise
-                                                    .get(path_line.spline_one.as_dvec2().to_array())
-                                                    as f32,
-                                            ))
-                                            .xzy()
-                                                * VOXEL_SIZE,
-                                            Direction3d::Y,
+                                            Isometry3d {
+                                                rotation: Quat::from_rotation_arc(Vec3::Z, Vec3::Y),
+                                                translation: Vec3A::from((
+                                                    path_line.spline_one,
+                                                    terrain_noise.get(
+                                                        path_line.spline_one.as_dvec2().to_array(),
+                                                    )
+                                                        as f32,
+                                                ))
+                                                .xzy()
+                                                    * VOXEL_SIZE,
+                                            },
                                             debug_resource.path_circle_radius,
-                                            Color::GREEN,
+                                            Color::srgb(0., 200. / 255., 0.),
                                         );
                                         gizmos.circle(
-                                            Vec3::from((
-                                                path_line.spline_two,
-                                                terrain_noise
-                                                    .get(path_line.spline_two.as_dvec2().to_array())
-                                                    as f32,
-                                            ))
-                                            .xzy()
-                                                * VOXEL_SIZE,
-                                            Direction3d::Y,
+                                            Isometry3d {
+                                                rotation: Quat::from_rotation_arc(Vec3::Z, Vec3::Y),
+                                                translation: Vec3A::from((
+                                                    path_line.spline_two,
+                                                    terrain_noise.get(
+                                                        path_line.spline_two.as_dvec2().to_array(),
+                                                    )
+                                                        as f32,
+                                                ))
+                                                .xzy()
+                                                    * VOXEL_SIZE,
+                                            },
                                             debug_resource.path_circle_radius,
-                                            Color::RED,
+                                            Color::srgb(200. / 255., 0., 0.),
                                         );
                                         gizmos.circle(
-                                            Vec3::from((
-                                                path_line.start.as_vec2(),
-                                                terrain_noise
-                                                    .get(path_line.start.as_dvec2().to_array())
-                                                    as f32,
-                                            ))
-                                            .xzy()
-                                                * VOXEL_SIZE,
-                                            Direction3d::Y,
+                                            Isometry3d {
+                                                rotation: Quat::from_rotation_arc(Vec3::Z, Vec3::Y),
+                                                translation: Vec3A::from((
+                                                    path_line.start.as_vec2(),
+                                                    terrain_noise
+                                                        .get(path_line.start.as_dvec2().to_array())
+                                                        as f32,
+                                                ))
+                                                .xzy()
+                                                    * VOXEL_SIZE,
+                                            },
                                             debug_resource.path_circle_radius,
-                                            Color::GREEN,
+                                            Color::srgb(0., 200. / 255., 0.),
                                         );
                                         gizmos.circle(
-                                            Vec3::from((
-                                                path_line.end.as_vec2(),
-                                                terrain_noise
-                                                    .get(path_line.end.as_dvec2().to_array())
-                                                    as f32,
-                                            ))
-                                            .xzy()
-                                                * VOXEL_SIZE,
-                                            Direction3d::Y,
+                                            Isometry3d {
+                                                rotation: Quat::from_rotation_arc(Vec3::Z, Vec3::Y),
+                                                translation: Vec3A::from((
+                                                    path_line.end.as_vec2(),
+                                                    terrain_noise
+                                                        .get(path_line.end.as_dvec2().to_array())
+                                                        as f32,
+                                                ))
+                                                .xzy()
+                                                    * VOXEL_SIZE,
+                                            },
                                             debug_resource.path_circle_radius,
-                                            Color::RED,
+                                            Color::srgb(200. / 255., 0., 0.),
                                         );
 
                                         for i in 1..path_line.sample_points.len() {
@@ -886,7 +896,7 @@ fn draw_path_gizmos(
                                                 ))
                                                 .xzy()
                                                     * VOXEL_SIZE,
-                                                Color::RED,
+                                                Color::srgb(200. / 255., 0., 0.),
                                             );
                                         }
 
@@ -894,48 +904,69 @@ fn draw_path_gizmos(
                                             .closest_point_on_path(player_voxel_pos, IVec2::ONE * 5)
                                         {
                                             gizmos.circle(
-                                                Vec3::from((
-                                                    player_pos_on_path,
-                                                    terrain_noise.get(
-                                                        player_pos_on_path.as_dvec2().to_array(),
-                                                    )
-                                                        as f32,
-                                                ))
-                                                .xzy()
-                                                    * VOXEL_SIZE,
-                                                Direction3d::Y,
+                                                Isometry3d {
+                                                    rotation: Quat::from_rotation_arc(
+                                                        Vec3::Z,
+                                                        Vec3::Y,
+                                                    ),
+                                                    translation: Vec3A::from((
+                                                        player_pos_on_path,
+                                                        terrain_noise.get(
+                                                            player_pos_on_path
+                                                                .as_dvec2()
+                                                                .to_array(),
+                                                        )
+                                                            as f32,
+                                                    ))
+                                                    .xzy()
+                                                        * VOXEL_SIZE,
+                                                },
                                                 debug_resource.path_circle_radius,
-                                                Color::BLUE,
+                                                Color::srgb(0., 0., 200. / 255.),
                                             );
                                             gizmos.circle(
-                                                Vec3::from((
-                                                    player_pos_on_path.as_ivec2().as_vec2()
-                                                        + VOXEL_SIZE,
-                                                    terrain_noise.get(
-                                                        player_pos_on_path.as_dvec2().to_array(),
-                                                    )
-                                                        as f32,
-                                                ))
-                                                .xzy()
-                                                    * VOXEL_SIZE,
-                                                Direction3d::Y,
+                                                Isometry3d {
+                                                    rotation: Quat::from_rotation_arc(
+                                                        Vec3::Z,
+                                                        Vec3::Y,
+                                                    ),
+                                                    translation: Vec3A::from((
+                                                        player_pos_on_path.as_ivec2().as_vec2()
+                                                            + VOXEL_SIZE,
+                                                        terrain_noise.get(
+                                                            player_pos_on_path
+                                                                .as_dvec2()
+                                                                .to_array(),
+                                                        )
+                                                            as f32,
+                                                    ))
+                                                    .xzy()
+                                                        * VOXEL_SIZE,
+                                                },
                                                 debug_resource.path_circle_radius,
-                                                Color::CYAN,
+                                                Color::srgb(0., 200. / 255., 200. / 255.),
                                             );
 
                                             gizmos.circle(
-                                                Vec3::from((
-                                                    player_voxel_pos.as_vec2() + VOXEL_SIZE,
-                                                    terrain_noise.get(
-                                                        player_pos_on_path.as_dvec2().to_array(),
-                                                    )
-                                                        as f32,
-                                                ))
-                                                .xzy()
-                                                    * VOXEL_SIZE,
-                                                Direction3d::Y,
+                                                Isometry3d {
+                                                    rotation: Quat::from_rotation_arc(
+                                                        Vec3::Z,
+                                                        Vec3::Y,
+                                                    ),
+                                                    translation: Vec3A::from((
+                                                        player_voxel_pos.as_vec2() + VOXEL_SIZE,
+                                                        terrain_noise.get(
+                                                            player_pos_on_path
+                                                                .as_dvec2()
+                                                                .to_array(),
+                                                        )
+                                                            as f32,
+                                                    ))
+                                                    .xzy()
+                                                        * VOXEL_SIZE,
+                                                },
                                                 debug_resource.path_circle_radius,
-                                                Color::AQUAMARINE,
+                                                Color::srgb(0., 100. / 255., 200. / 255.),
                                             );
                                         }
                                     }

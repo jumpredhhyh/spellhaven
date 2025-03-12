@@ -28,7 +28,7 @@ fn main() {
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {
             global: false,
-            default_color: Color::RED,
+            default_color: Color::srgb(1., 0., 0.),
         })
         .run();
 }

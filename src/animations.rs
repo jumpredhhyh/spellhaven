@@ -36,7 +36,7 @@ fn animate_spawn_animation(
             continue;
         }
 
-        spawn_animation.0 += time.delta_seconds();
+        spawn_animation.0 += time.delta_secs();
     }
 }
 
@@ -66,6 +66,6 @@ fn animate_despawn_animation(
             continue;
         }
 
-        despawn_animation.0 += time.delta_seconds();
+        despawn_animation.0 += time.delta_secs();
     }
 }

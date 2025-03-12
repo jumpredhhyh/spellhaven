@@ -21,11 +21,10 @@ pub fn update_task_ui(
     let chunk_queue_count = chunk_task_generators.iter().count();
 
     for mut text in &mut country_texts {
-        text.sections[0].value = format!("Country Tasks: {:?}", country_count);
+        text.0 = format!("Country Tasks: {:?}", country_count);
     }
 
     for mut text in &mut chunk_texts {
-        text.sections[0].value =
-            format!("Chunk Tasks: {:?} + {:?}", chunk_count, chunk_queue_count);
+        text.0 = format!("Chunk Tasks: {:?} + {:?}", chunk_count, chunk_queue_count);
     }
 }

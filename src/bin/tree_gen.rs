@@ -1,6 +1,5 @@
-use bevy::core_pipeline::experimental::taa::TemporalAntiAliasBundle;
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
-use bevy::pbr::{ExtendedMaterial, ScreenSpaceAmbientOcclusionBundle};
+use bevy::pbr::{ExtendedMaterial, ScreenSpaceAmbientOcclusion};
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
 use bevy::window::PresentMode;
@@ -47,9 +46,8 @@ fn main() {
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {
             global: false,
-            default_color: Color::RED,
+            default_color: Color::srgb(1., 0., 0.),
         })
-        .insert_resource(Msaa::Off)
         .run();
 }
 
@@ -60,39 +58,32 @@ fn setup(
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
 ) {
     commands.spawn((
-        DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                shadows_enabled: true,
-                illuminance: 1000.,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, 2.0, 0.0),
-                rotation: Quat::from_rotation_x(-PI / 3.),
-                ..default()
-            },
+        DirectionalLight {
+            shadows_enabled: true,
+            illuminance: 1000.,
+            ..default()
+        },
+        Transform {
+            translation: Vec3::new(0.0, 2.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 3.),
             ..default()
         },
         Name::new("Light"),
     ));
 
-    commands
-        .spawn((
-            Camera3dBundle {
-                transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-                projection: Projection::Perspective(PerspectiveProjection {
-                    far: 2f32.powi(20),
-                    ..default()
-                }),
-                exposure: Exposure { ev100: 10f32 },
-                ..default()
-            },
-            PanOrbitCamera::default(),
-            AtmosphereCamera::default(),
-            Name::new("CAMMIE"),
-            ScreenSpaceAmbientOcclusionBundle::default(),
-        ))
-        .insert(TemporalAntiAliasBundle::default());
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Projection::Perspective(PerspectiveProjection {
+            far: 2f32.powi(20),
+            ..default()
+        }),
+        Exposure { ev100: 10f32 },
+        PanOrbitCamera::default(),
+        AtmosphereCamera::default(),
+        Name::new("CAMMIE"),
+        ScreenSpaceAmbientOcclusion::default(),
+    ));
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
@@ -100,16 +91,16 @@ fn setup(
     });
 
     let mut blocks = VoxelData::default();
-    blocks.set_block(IVec3::new(1, 1, 1), BlockType::Grass);
+    blocks.set_block(IVec3::new(1, 1, 1), BlockType::Grass(0));
 
     let l_system = TreeLSystem::grow_new(create_branch_piece(&Vec3::ZERO, 0., 0.));
     l_system.apply_tree_at(IVec3::new(20, 1, 20), &mut blocks);
 
     let mesh = generate_mesh(&blocks, 0, ChunkLod::Full);
 
-    commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(mesh.expect("No Mesh").0),
-        material: materials.add(ExtendedMaterial {
+    commands.spawn((
+        Mesh3d(meshes.add(mesh.expect("No Mesh").0)),
+        MeshMaterial3d(materials.add(ExtendedMaterial {
             base: Color::WHITE.into(),
             extension: TerrainMaterial {
                 chunk_blocks: blocks.array,
@@ -118,10 +109,8 @@ fn setup(
                 chunk_lod: ChunkLod::Full.multiplier_i32(),
                 min_chunk_height: 0,
             },
-        }),
-        transform: Transform::default(),
-        ..default()
-    });
+        })),
+    ));
 }
 
 fn create_branch_piece(pos: &Vec3, angle_x: f32, angle_z: f32) -> Vec<LSystemEntry> {

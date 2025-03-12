@@ -2,11 +2,11 @@ use crate::debug_tools::debug_resource::SpellhavenDebug;
 use crate::ui::ui::UiSpawnCallback;
 use crate::world_generation::chunk_generation::VOXEL_SIZE;
 use crate::world_generation::chunk_loading::chunk_loader::ChunkLoader;
-use bevy::core_pipeline::experimental::taa::{TemporalAntiAliasBundle, TemporalAntiAliasPlugin};
-use bevy::ecs::system::SystemId;
-use bevy::pbr::ScreenSpaceAmbientOcclusionBundle;
+use bevy::core_pipeline::experimental::taa::TemporalAntiAliasPlugin;
+use bevy::pbr::ScreenSpaceAmbientOcclusion;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
+use bevy::{core_pipeline::experimental::taa::TemporalAntiAliasing, ecs::system::SystemId};
 use bevy_atmosphere::prelude::AtmosphereCamera;
 use bevy_panorbit_camera::PanOrbitCamera;
 use bevy_rapier3d::prelude::{
@@ -22,7 +22,6 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(TemporalAntiAliasPlugin)
-            .insert_resource(Msaa::Off)
             .add_systems(Startup, register_spawn_player_system)
             .add_systems(Update, (movement, move_camera, move_body));
     }
@@ -59,7 +58,7 @@ fn spawn_player(
     // Player
     commands.spawn((
         RigidBody::KinematicPositionBased,
-        TransformBundle::from_transform(Transform::from_xyz(0., 2000., 0.)),
+        Transform::from_xyz(0., 2000., 0.),
         Collider::cuboid(0.4, 0.9, 0.4),
         KinematicCharacterController {
             offset: CharacterLength::Absolute(0.01),
@@ -79,47 +78,39 @@ fn spawn_player(
         Name::new("Player"),
     ));
 
-    commands
-        .spawn((
-            Camera3dBundle {
-                transform: Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-                projection: Projection::Perspective(PerspectiveProjection {
-                    far: 2f32.powi(20),
-                    ..default()
-                }),
-                exposure: Exposure { ev100: 10f32 },
-                ..default()
-            },
-            PanOrbitCamera::default(),
-            AtmosphereCamera::default(),
-            PlayerCamera,
-            Name::new("PlayerCamera"),
-            ScreenSpaceAmbientOcclusionBundle::default(),
-        ))
-        .insert(TemporalAntiAliasBundle::default());
+    commands.spawn((
+        Camera3d::default(),
+        Msaa::Off,
+        TemporalAntiAliasing::default(),
+        Transform::from_xyz(-4.0, 6.5, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Projection::Perspective(PerspectiveProjection {
+            far: 2f32.powi(20),
+            ..default()
+        }),
+        Exposure { ev100: 10f32 },
+        PanOrbitCamera::default(),
+        AtmosphereCamera::default(),
+        PlayerCamera,
+        Name::new("PlayerCamera"),
+        ScreenSpaceAmbientOcclusion::default(),
+    ));
 
     commands
-        .spawn((PbrBundle::default(), PlayerBody, Name::new("PlayerBody")))
+        .spawn((PlayerBody, Name::new("PlayerBody"), Mesh3d::default()))
         .with_children(|commands| {
             commands.spawn((
-                SceneBundle {
-                    scene: asset_server.load("player.gltf#Scene0"),
-                    transform: Transform::from_xyz(0., 0.15, 0.),
-                    ..default()
-                },
+                SceneRoot(asset_server.load("player.gltf#Scene0")),
+                Transform::from_xyz(0., 0.15, 0.),
                 Name::new("PlayerHead"),
             ));
             commands.spawn((
-                PbrBundle {
-                    mesh: meshes.add(Mesh::from(Capsule3d {
-                        radius: 0.4,
-                        half_length: 0.3,
-                        ..default()
-                    })),
-                    transform: Transform::from_xyz(0., -0.35, 0.),
-                    material: materials.add(Color::rgb(0.8, 0.7, 0.6)),
+                Mesh3d(meshes.add(Mesh::from(Capsule3d {
+                    radius: 0.4,
+                    half_length: 0.3,
                     ..default()
-                },
+                }))),
+                MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
+                Transform::from_xyz(0., -0.35, 0.),
                 Name::new("PlayerTorso"),
             ));
         });
@@ -230,7 +221,7 @@ fn movement(
             move_direction.y -= 0.4;
         }
 
-        move_direction *= time.delta_seconds();
+        move_direction *= time.delta_secs();
 
         // Jump if space pressed and the player is close enough to the ground
         if keyboard_input.pressed(KeyCode::Space)

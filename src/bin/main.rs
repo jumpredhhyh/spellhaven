@@ -42,24 +42,21 @@ fn main() {
         .add_systems(Startup, setup)
         .insert_resource(WireframeConfig {
             global: false,
-            default_color: Color::RED,
+            default_color: Color::srgb(1., 0., 0.),
         })
         .run();
 }
 
 fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
     commands.spawn((
-        DirectionalLightBundle {
-            directional_light: DirectionalLight {
-                shadows_enabled: true,
-                illuminance: 1000.,
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0.0, 2.0, 0.0),
-                rotation: Quat::from_rotation_x(-PI / 3.),
-                ..default()
-            },
+        DirectionalLight {
+            shadows_enabled: true,
+            illuminance: 1000.,
+            ..default()
+        },
+        Transform {
+            translation: Vec3::new(0.0, 2.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 3.),
             ..default()
         },
         Name::new("Light"),

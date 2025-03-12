@@ -29,88 +29,65 @@ fn register_spawn_ui_system(world: &mut World) {
 
 fn spawn_ui(mut commands: Commands) {
     commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
             ..default()
         })
         .with_children(|commands| {
             commands.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "FPS!",
-                        TextStyle {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                    ),
-                    style: Style {
-                        width: Val::Auto,
-                        height: Val::Px(32.0),
-                        margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
-                        ..default()
-                    },
+                Node {
+                    width: Val::Auto,
+                    height: Val::Px(32.0),
+                    margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
+                    ..default()
+                },
+                Text("FPS!".to_string()),
+                TextFont {
+                    font_size: 32.0,
                     ..default()
                 },
                 FpsText,
             ));
             commands.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "TRIANGLES!",
-                        TextStyle {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                    ),
-                    style: Style {
-                        width: Val::Auto,
-                        height: Val::Px(32.0),
-                        margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
-                        ..default()
-                    },
+                Node {
+                    width: Val::Auto,
+                    height: Val::Px(32.0),
+                    margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
+                    ..default()
+                },
+                Text("TRIANGLES!".to_string()),
+                TextFont {
+                    font_size: 32.0,
                     ..default()
                 },
                 TriangleText,
             ));
             commands.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "Country Tasks!",
-                        TextStyle {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                    ),
-                    style: Style {
-                        width: Val::Auto,
-                        height: Val::Px(32.0),
-                        margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
-                        ..default()
-                    },
+                Node {
+                    width: Val::Auto,
+                    height: Val::Px(32.0),
+                    margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
+                    ..default()
+                },
+                Text("Country Tasks!".to_string()),
+                TextFont {
+                    font_size: 32.0,
                     ..default()
                 },
                 CountryTaskText,
             ));
             commands.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "Chunk Tasks!",
-                        TextStyle {
-                            font_size: 32.0,
-                            ..default()
-                        },
-                    ),
-                    style: Style {
-                        width: Val::Auto,
-                        height: Val::Px(32.0),
-                        margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
-                        ..default()
-                    },
+                Node {
+                    width: Val::Auto,
+                    height: Val::Px(32.0),
+                    margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(15.0), Val::Px(0.0)),
+                    ..default()
+                },
+                Text("Chunk Tasks!".to_string()),
+                TextFont {
+                    font_size: 32.0,
                     ..default()
                 },
                 ChunkTaskText,

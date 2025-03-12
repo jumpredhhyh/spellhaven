@@ -1,6 +1,6 @@
 use bevy::{
     app::{Plugin, Startup, Update},
-    core_pipeline::core_2d::Camera2dBundle,
+    core_pipeline::core_2d::Camera2d,
     ecs::{
         component::Component,
         event::EventReader,
@@ -29,7 +29,7 @@ impl Plugin for FlatCameraPlugin {
 pub struct FlatCamera;
 
 fn setup(mut commands: Commands) {
-    commands.spawn((Camera2dBundle::default(), FlatCamera));
+    commands.spawn((Camera2d::default(), FlatCamera));
 }
 
 fn move_camera(

@@ -36,7 +36,7 @@ impl GenerationOptionsResource {
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: get_seeded_white_noise(rng.gen()),
+                        noise: get_seeded_white_noise(rng.random()),
                         generation_size: [30, 30],
                         grid_offset: [15, 15],
                         generate_debug_blocks: false,
@@ -45,7 +45,7 @@ impl GenerationOptionsResource {
                     StructureGenerator {
                         model: tree.0.clone(),
                         model_size: tree.1,
-                        noise: get_seeded_white_noise(rng.gen()),
+                        noise: get_seeded_white_noise(rng.random()),
                         generation_size: [30, 30],
                         grid_offset: [0, 0],
                         generate_debug_blocks: false,
@@ -54,7 +54,7 @@ impl GenerationOptionsResource {
                     StructureGenerator {
                         model: tree_house.0.clone(),
                         model_size: tree_house.1,
-                        noise: get_seeded_white_noise(rng.gen()),
+                        noise: get_seeded_white_noise(rng.random()),
                         generation_size: [1000, 1000],
                         grid_offset: [7, 11],
                         generate_debug_blocks: false,

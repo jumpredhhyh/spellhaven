@@ -160,7 +160,7 @@ impl VoxelWorld for QuadTreeVoxelWorld {
                         new_chunk_pos[2] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
                     ),
                     collider: if chunk_lod == ChunkLod::Full {
-                        Some(Collider::trimesh(mesh.1, mesh.2))
+                        Some(Collider::trimesh(mesh.1, mesh.2).expect("Failed to build trimesh"))
                     } else {
                         None
                     },
