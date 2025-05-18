@@ -1,4 +1,7 @@
+use std::ops::Range;
+
 use bevy::math::{IVec3, Vec3};
+use rand::Rng;
 
 use crate::{
     utils::{rotate_around, vec_round_to_int, RotationDirection},
@@ -16,10 +19,12 @@ pub enum LSystemEntryType {
         angle_z: f32,
         available_dirs: Directions,
     },
+    Leaf,
 }
 
 pub struct LSystemEntry {
     pub pos: Vec3,
+    pub thickness: f32,
     pub entry_type: LSystemEntryType,
 }
 
@@ -38,10 +43,36 @@ impl TreeLSystem {
         for _ in 0..3 {
             TreeLSystem::recurse_l_system(&mut start_state);
         }
+        TreeLSystem::add_leafs(&mut start_state);
 
         let voxels: Vec<(IVec3, BlockType)> = start_state
             .iter()
-            .map(|entry| (vec_round_to_int(&entry.pos), BlockType::Path))
+            .flat_map(|entry| {
+                let center = vec_round_to_int(&entry.pos);
+                let thickness = entry.thickness.ceil() as i32;
+                let mut blocks = vec![];
+
+                for x in -thickness..thickness {
+                    for y in -thickness..thickness {
+                        for z in -thickness..thickness {
+                            let current_pos_i = center + IVec3 { x, y, z };
+                            let current_pos = current_pos_i.as_vec3();
+
+                            if current_pos.distance(entry.pos) < entry.thickness {
+                                blocks.push((
+                                    current_pos_i,
+                                    match entry.entry_type {
+                                        LSystemEntryType::Leaf => BlockType::Grass(50),
+                                        _ => BlockType::Path,
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                blocks
+            })
             .collect();
 
         Self { voxels }
@@ -61,36 +92,77 @@ impl TreeLSystem {
                 LSystemEntryType::Branch {
                     angle_x,
                     angle_z,
-                    available_dirs,
+                    available_dirs: _,
                 } => {
-                    let branch_l = if available_dirs.contains(Directions::NegXZ) {
-                        create_branch_piece(&entry.pos, angle_x - 15., angle_z + 15.)
-                    } else {
-                        vec![]
-                    };
-                    let branch_r = if available_dirs.contains(Directions::XNegZ) {
-                        create_branch_piece(&entry.pos, angle_x + 15., angle_z - 15.)
-                    } else {
-                        vec![]
-                    };
-                    let branch_b = if available_dirs.contains(Directions::NegXNegZ) {
-                        create_branch_piece(&entry.pos, angle_x - 15., angle_z - 15.)
-                    } else {
-                        vec![]
-                    };
-                    let branch_f = if available_dirs.contains(Directions::XZ) {
-                        create_branch_piece(&entry.pos, angle_x + 15., angle_z + 15.)
-                    } else {
-                        vec![]
-                    };
-                    let branch_s = create_branch_piece(&entry.pos, angle_x, angle_z);
-                    let branches: Vec<LSystemEntry> = branch_l
-                        .into_iter()
-                        .chain(branch_r.into_iter())
-                        .chain(branch_b.into_iter())
-                        .chain(branch_f.into_iter())
-                        .chain(branch_s.into_iter())
-                        .collect();
+                    let mut rng = rand::rng();
+                    let random_range: Range<f32> = -45.0..45.0;
+                    let new_thickness = (entry.thickness - 0.5).max(0.75);
+
+                    let branches: Vec<LSystemEntry> = create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range.clone()),
+                        new_thickness,
+                    )
+                    .into_iter()
+                    .chain(create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range.clone()),
+                        new_thickness,
+                    ))
+                    .chain(create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range.clone()),
+                        new_thickness,
+                    ))
+                    .chain(create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range.clone()),
+                        new_thickness,
+                    ))
+                    .chain(create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range.clone()),
+                        new_thickness,
+                    ))
+                    .chain(create_branch_piece(
+                        &entry.pos,
+                        angle_x + rng.random_range(random_range.clone()),
+                        angle_z + rng.random_range(random_range),
+                        new_thickness,
+                    ))
+                    .collect();
+
+                    let length = branches.len();
+
+                    data.splice(i..i + 1, branches);
+                    i += length
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
+    fn add_leafs(data: &mut Vec<LSystemEntry>) {
+        let mut i = 0usize;
+        while i < data.len() {
+            let entry = &data[i];
+            match entry.entry_type {
+                LSystemEntryType::Branch {
+                    angle_x: _,
+                    angle_z: _,
+                    available_dirs: _,
+                } => {
+                    let branches: Vec<LSystemEntry> = vec![LSystemEntry {
+                        pos: entry.pos,
+                        entry_type: LSystemEntryType::Leaf,
+                        thickness: 2.0,
+                    }];
 
                     let length = branches.len();
 
@@ -104,12 +176,18 @@ impl TreeLSystem {
     }
 }
 
-fn create_branch_piece(pos: &Vec3, angle_x: f32, angle_z: f32) -> Vec<LSystemEntry> {
-    const LEN: usize = 10;
+fn create_branch_piece(
+    pos: &Vec3,
+    angle_x: f32,
+    angle_z: f32,
+    thickness: f32,
+) -> Vec<LSystemEntry> {
+    let mut rng = rand::rng();
+    let length: usize = rng.random_range(7..11);
 
     let mut pieces = Vec::new();
 
-    for i in 0..LEN {
+    for i in 0..length {
         pieces.push(LSystemEntry {
             pos: rotate_around(
                 &rotate_around(
@@ -123,12 +201,13 @@ fn create_branch_piece(pos: &Vec3, angle_x: f32, angle_z: f32) -> Vec<LSystemEnt
                 &RotationDirection::X,
             ),
             entry_type: LSystemEntryType::Stem,
+            thickness,
         });
     }
     pieces.push(LSystemEntry {
         pos: rotate_around(
             &rotate_around(
-                &(*pos + (Vec3::Y * (LEN as f32))),
+                &(*pos + (Vec3::Y * (length as f32))),
                 pos,
                 angle_z,
                 &RotationDirection::Z,
@@ -142,6 +221,7 @@ fn create_branch_piece(pos: &Vec3, angle_x: f32, angle_z: f32) -> Vec<LSystemEnt
             angle_z,
             available_dirs: Directions::from_angles(angle_x, angle_z),
         },
+        thickness,
     });
     pieces
 }
