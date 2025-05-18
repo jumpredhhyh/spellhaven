@@ -26,6 +26,7 @@ use std::sync::{Arc, Mutex};
 
 pub mod mesh_generation;
 pub mod noise;
+pub mod structure_generator;
 pub mod voxel_generation;
 pub mod voxel_types;
 

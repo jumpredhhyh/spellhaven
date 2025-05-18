@@ -1,4 +1,6 @@
-use crate::world_generation::chunk_generation::voxel_generation::StructureGenerator;
+use crate::world_generation::chunk_generation::structure_generator::{
+    FixedStructureGenerator, StructureGenerator, VoxelStructureMetadata,
+};
 use crate::world_generation::chunk_generation::BlockType;
 use crate::world_generation::chunk_loading::country_cache::{
     CountryCache, PathCache, StructureCache,
@@ -32,34 +34,40 @@ impl GenerationOptionsResource {
                 seed,
                 path_cache: GenerationCache::new(),
                 structure_cache: GenerationCache::new(),
-                structures: vec![
-                    StructureGenerator {
-                        model: tree.0.clone(),
-                        model_size: tree.1,
-                        noise: get_seeded_white_noise(rng.random()),
-                        generation_size: [30, 30],
-                        grid_offset: [15, 15],
-                        generate_debug_blocks: false,
-                        debug_rgb_multiplier: [1., 0., 0.],
-                    },
-                    StructureGenerator {
-                        model: tree.0.clone(),
-                        model_size: tree.1,
-                        noise: get_seeded_white_noise(rng.random()),
-                        generation_size: [30, 30],
-                        grid_offset: [0, 0],
-                        generate_debug_blocks: false,
-                        debug_rgb_multiplier: [0., 1., 0.],
-                    },
-                    StructureGenerator {
-                        model: tree_house.0.clone(),
-                        model_size: tree_house.1,
-                        noise: get_seeded_white_noise(rng.random()),
-                        generation_size: [1000, 1000],
-                        grid_offset: [7, 11],
-                        generate_debug_blocks: false,
-                        debug_rgb_multiplier: [1., 1., 1.],
-                    },
+                structure_generators: vec![
+                    Box::new(FixedStructureGenerator {
+                        fixed_structure_model: tree.0.clone(),
+                        fixed_structure_metadata: VoxelStructureMetadata {
+                            model_size: tree.1,
+                            generation_size: [30, 30],
+                            grid_offset: [15, 15],
+                            generate_debug_blocks: false,
+                            debug_rgb_multiplier: [1., 0., 0.],
+                            noise: get_seeded_white_noise(rng.random()),
+                        },
+                    }),
+                    Box::new(FixedStructureGenerator {
+                        fixed_structure_model: tree.0.clone(),
+                        fixed_structure_metadata: VoxelStructureMetadata {
+                            model_size: tree.1,
+                            generation_size: [30, 30],
+                            grid_offset: [0, 0],
+                            generate_debug_blocks: false,
+                            debug_rgb_multiplier: [0., 1., 0.],
+                            noise: get_seeded_white_noise(rng.random()),
+                        },
+                    }),
+                    Box::new(FixedStructureGenerator {
+                        fixed_structure_model: tree_house.0.clone(),
+                        fixed_structure_metadata: VoxelStructureMetadata {
+                            model_size: tree_house.1,
+                            generation_size: [1000, 1000],
+                            grid_offset: [7, 11],
+                            generate_debug_blocks: false,
+                            debug_rgb_multiplier: [1., 1., 1.],
+                            noise: get_seeded_white_noise(rng.random()),
+                        },
+                    }),
                 ],
                 structure_assets: vec![StructureAsset {
                     _blocks: (*box_structure.0).clone(),
@@ -79,7 +87,7 @@ impl Default for GenerationOptionsResource {
 fn get_seeded_white_noise(seed: u64) -> FastNoiseLite {
     let mut noise = FastNoiseLite::with_seed(seed as i32);
     noise.set_noise_type(Some(fastnoise_lite::NoiseType::Value));
-    noise.set_frequency(Some(0.1));
+    noise.set_frequency(Some(100.));
     noise
 }
 
@@ -90,7 +98,7 @@ pub enum GenerationState<T> {
 
 pub struct GenerationOptions {
     pub seed: u64,
-    pub structures: Vec<StructureGenerator>,
+    pub structure_generators: Vec<Box<dyn StructureGenerator + Send + Sync>>,
     pub structure_assets: Vec<StructureAsset>,
     pub path_cache: GenerationCache<IVec2, PathCache>,
     pub structure_cache: GenerationCache<IVec2, StructureCache>,

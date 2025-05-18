@@ -5,11 +5,9 @@ use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
-use fastnoise_lite::FastNoiseLite;
 use noise::{Add, Constant, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
-use std::sync::Arc;
 use std::usize;
 
 use super::noise::full_cache::FullCache;
@@ -19,17 +17,6 @@ use super::noise::shift_n_scale::ShiftNScale;
 use super::noise::smooth_step::SmoothStep;
 use super::noise::steepness::Steepness;
 use super::voxel_types::VoxelData;
-
-pub struct StructureGenerator {
-    pub model: Arc<Vec<Vec<Vec<BlockType>>>>,
-    pub model_size: [i32; 3],
-    pub noise: FastNoiseLite,
-    pub generation_size: [i32; 2],
-    pub grid_offset: [i32; 2],
-    pub generate_debug_blocks: bool,
-    pub debug_rgb_multiplier: [f32; 3],
-    //pub height_offset: i32
-}
 
 pub fn generate_voxels(
     position: [i32; 3],
@@ -143,21 +130,22 @@ pub fn generate_voxels(
                 );
             }
 
-            for structure in &generation_options.structures {
+            for structure_generator in &generation_options.structure_generators {
+                let structure_metadata = structure_generator.get_structure_metadata();
                 let structure_offset_x = div_floor(
-                    total_x + structure.grid_offset[0],
-                    structure.generation_size[0],
+                    total_x + structure_metadata.grid_offset[0],
+                    structure_metadata.generation_size[0],
                 );
                 let structure_offset_z = div_floor(
-                    total_z + structure.grid_offset[1],
-                    structure.generation_size[1],
+                    total_z + structure_metadata.grid_offset[1],
+                    structure_metadata.generation_size[1],
                 );
-                let structure_value = structure
+                let structure_value = structure_metadata
                     .noise
                     .get_noise_2d(structure_offset_x as f32, structure_offset_z as f32)
                     * 0.5
                     + 0.5;
-                if structure.generate_debug_blocks {
+                if structure_metadata.generate_debug_blocks {
                     let top_terrain = (noise_height.min(CHUNK_SIZE as f32 + min_height as f32)
                         as i32
                         - min_height.min(noise_height as i32))
@@ -165,17 +153,20 @@ pub fn generate_voxels(
                         - 1;
                     let current_color =
                         match blocks.get_block([x as i32, top_terrain as i32, z as i32]) {
-                            BlockType::StructureDebug(r, g, b) => (r, g, b),
+                            // BlockType::StructureDebug(r, g, b) => (r, g, b),
                             _ => (0u8, 0u8, 0u8),
                         };
                     blocks.set_block(
                         [x as i32, top_terrain as i32, z as i32],
                         BlockType::StructureDebug(
-                            ((structure_value) * structure.debug_rgb_multiplier[0] * 255.) as u8
+                            (structure_value * structure_metadata.debug_rgb_multiplier[0] * 255.)
+                                as u8
                                 + current_color.0,
-                            ((structure_value) * structure.debug_rgb_multiplier[1] * 255.) as u8
+                            (structure_value * structure_metadata.debug_rgb_multiplier[1] * 255.)
+                                as u8
                                 + current_color.1,
-                            ((structure_value) * structure.debug_rgb_multiplier[2] * 255.) as u8
+                            (structure_value * structure_metadata.debug_rgb_multiplier[2] * 255.)
+                                as u8
                                 + current_color.2,
                         ),
                     );
@@ -183,37 +174,41 @@ pub fn generate_voxels(
                 let mut rand = StdRng::seed_from_u64((structure_value.abs() * 10000.) as u64);
 
                 if structure_value > 0. {
-                    let random_x = rand
-                        .random_range(0..=structure.generation_size[0] - structure.model_size[0]);
-                    let random_z = rand
-                        .random_range(0..=structure.generation_size[1] - structure.model_size[2]);
+                    let random_x = rand.random_range(
+                        0..=structure_metadata.generation_size[0]
+                            - structure_metadata.model_size[0],
+                    );
+                    let random_z = rand.random_range(
+                        0..=structure_metadata.generation_size[1]
+                            - structure_metadata.model_size[2],
+                    );
 
-                    let structure_x: i32 = (total_x + structure.grid_offset[0]
-                        - structure_offset_x * structure.generation_size[0])
+                    let structure_x: i32 = (total_x + structure_metadata.grid_offset[0]
+                        - structure_offset_x * structure_metadata.generation_size[0])
                         .abs()
                         - random_x;
-                    let structure_z: i32 = (total_z + structure.grid_offset[1]
-                        - structure_offset_z * structure.generation_size[1])
+                    let structure_z: i32 = (total_z + structure_metadata.grid_offset[1]
+                        - structure_offset_z * structure_metadata.generation_size[1])
                         .abs()
                         - random_z;
 
                     if structure_x < 0
                         || structure_z < 0
-                        || structure_x >= structure.model_size[0]
-                        || structure_z >= structure.model_size[2]
+                        || structure_x >= structure_metadata.model_size[0]
+                        || structure_z >= structure_metadata.model_size[2]
                     {
                         continue;
                     }
 
                     let structure_noise_height_x = structure_offset_x
-                        * structure.generation_size[0]
-                        + (structure.model_size[0] / 2)
-                        - structure.grid_offset[0]
+                        * structure_metadata.generation_size[0]
+                        + (structure_metadata.model_size[0] / 2)
+                        - structure_metadata.grid_offset[0]
                         + random_x;
                     let structure_noise_height_z = structure_offset_z
-                        * structure.generation_size[1]
-                        + (structure.model_size[2] / 2)
-                        - structure.grid_offset[1]
+                        * structure_metadata.generation_size[1]
+                        + (structure_metadata.model_size[2] / 2)
+                        - structure_metadata.grid_offset[1]
                         + random_z;
 
                     let structure_steepness = terrain_steepness.get([
@@ -231,11 +226,16 @@ pub fn generate_voxels(
                     let (a, _, _, _) = get_min_distance_to_path(
                         structure_center,
                         &all_paths,
-                        IVec2::new(structure.model_size[0] / 2, structure.model_size[2] / 2)
-                            + IVec2::ONE * 10,
+                        IVec2::new(
+                            structure_metadata.model_size[0] / 2,
+                            structure_metadata.model_size[2] / 2,
+                        ) + IVec2::ONE * 10,
                     );
 
-                    if (a as i32) < structure.model_size[0] / 2 + structure.model_size[1] / 2 {
+                    if (a as i32)
+                        < structure_metadata.model_size[0] / 2
+                            + structure_metadata.model_size[1] / 2
+                    {
                         continue;
                     }
 
@@ -244,8 +244,12 @@ pub fn generate_voxels(
                         structure_noise_height_z as f64,
                     ]);
 
-                    for (index, sub_structure) in
-                        structure.model[structure_x as usize].iter().enumerate()
+                    for (index, sub_structure) in structure_generator.get_structure_model(IVec2 {
+                        x: structure_offset_x,
+                        y: structure_offset_z,
+                    })[structure_x as usize]
+                        .iter()
+                        .enumerate()
                     {
                         if (index as i32
                             + (noise_height * chunk_lod.multiplier_i32() as f64) as i32)
