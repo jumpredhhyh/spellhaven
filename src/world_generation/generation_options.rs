@@ -1,5 +1,5 @@
 use crate::world_generation::chunk_generation::structure_generator::{
-    FixedStructureGenerator, StructureGenerator, VoxelStructureMetadata,
+    FixedStructureGenerator, StructureGenerator, TreeStructureGenerator, VoxelStructureMetadata,
 };
 use crate::world_generation::chunk_generation::BlockType;
 use crate::world_generation::chunk_loading::country_cache::{
@@ -23,7 +23,6 @@ pub struct GenerationOptionsResource(
 
 impl GenerationOptionsResource {
     pub fn from_seed(seed: u64) -> Self {
-        let tree = vox_data_to_structure_data(&from_file("assets/tree_2.vox").unwrap());
         let tree_house = vox_data_to_structure_data(&from_file("assets/tree_house.vox").unwrap());
         let box_structure = vox_data_to_structure_data(&from_file("assets/box.vox").unwrap());
 
@@ -35,29 +34,37 @@ impl GenerationOptionsResource {
                 path_cache: GenerationCache::new(),
                 structure_cache: GenerationCache::new(),
                 structure_generators: vec![
-                    Box::new(FixedStructureGenerator {
-                        fixed_structure_model: tree.0.clone(),
-                        fixed_structure_metadata: VoxelStructureMetadata {
-                            model_size: tree.1,
-                            generation_size: [30, 30],
-                            grid_offset: [15, 15],
+                    Arc::new(Box::new(TreeStructureGenerator::new(
+                        VoxelStructureMetadata {
+                            model_size: [27, 27, 27],
+                            generation_size: [64, 64],
+                            grid_offset: [24, 16],
                             generate_debug_blocks: false,
-                            debug_rgb_multiplier: [1., 0., 0.],
+                            debug_rgb_multiplier: [1., 1., 1.],
                             noise: get_seeded_white_noise(rng.random()),
                         },
-                    }),
-                    Box::new(FixedStructureGenerator {
-                        fixed_structure_model: tree.0.clone(),
-                        fixed_structure_metadata: VoxelStructureMetadata {
-                            model_size: tree.1,
-                            generation_size: [30, 30],
-                            grid_offset: [0, 0],
+                    ))),
+                    Arc::new(Box::new(TreeStructureGenerator::new(
+                        VoxelStructureMetadata {
+                            model_size: [27, 27, 27],
+                            generation_size: [64, 64],
+                            grid_offset: [43, 52],
                             generate_debug_blocks: false,
-                            debug_rgb_multiplier: [0., 1., 0.],
+                            debug_rgb_multiplier: [1., 1., 1.],
                             noise: get_seeded_white_noise(rng.random()),
                         },
-                    }),
-                    Box::new(FixedStructureGenerator {
+                    ))),
+                    Arc::new(Box::new(TreeStructureGenerator::new(
+                        VoxelStructureMetadata {
+                            model_size: [27, 27, 27],
+                            generation_size: [64, 64],
+                            grid_offset: [10, 4],
+                            generate_debug_blocks: false,
+                            debug_rgb_multiplier: [1., 1., 1.],
+                            noise: get_seeded_white_noise(rng.random()),
+                        },
+                    ))),
+                    Arc::new(Box::new(FixedStructureGenerator {
                         fixed_structure_model: tree_house.0.clone(),
                         fixed_structure_metadata: VoxelStructureMetadata {
                             model_size: tree_house.1,
@@ -67,7 +74,7 @@ impl GenerationOptionsResource {
                             debug_rgb_multiplier: [1., 1., 1.],
                             noise: get_seeded_white_noise(rng.random()),
                         },
-                    }),
+                    })),
                 ],
                 structure_assets: vec![StructureAsset {
                     _blocks: (*box_structure.0).clone(),
@@ -98,7 +105,7 @@ pub enum GenerationState<T> {
 
 pub struct GenerationOptions {
     pub seed: u64,
-    pub structure_generators: Vec<Box<dyn StructureGenerator + Send + Sync>>,
+    pub structure_generators: Vec<Arc<Box<dyn StructureGenerator + Send + Sync>>>,
     pub structure_assets: Vec<StructureAsset>,
     pub path_cache: GenerationCache<IVec2, PathCache>,
     pub structure_cache: GenerationCache<IVec2, StructureCache>,

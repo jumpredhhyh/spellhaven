@@ -9,16 +9,17 @@ use bevy_atmosphere::prelude::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
-use rand::Rng;
+use fastnoise_lite::FastNoiseLite;
+use rand::{rng, RngCore};
 use spellhaven::animations::AnimationPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::terrain_material::TerrainMaterial;
 use spellhaven::world_generation::chunk_generation::mesh_generation::generate_mesh;
-use spellhaven::world_generation::chunk_generation::voxel_types::VoxelData;
-use spellhaven::world_generation::chunk_generation::BlockType;
-use spellhaven::world_generation::foliage_generation::tree_l_system::{
-    Directions, LSystemEntry, LSystemEntryType, TreeLSystem,
+use spellhaven::world_generation::chunk_generation::structure_generator::{
+    StructureGenerator, TreeStructureGenerator, VoxelStructureMetadata,
 };
+use spellhaven::world_generation::chunk_generation::voxel_types::VoxelData;
+use spellhaven::world_generation::chunk_generation::CHUNK_SIZE;
 use spellhaven::world_generation::voxel_world::ChunkLod;
 use std::f32::consts::PI;
 
@@ -58,9 +59,8 @@ struct TreeGen;
 
 fn setup(
     mut commands: Commands,
-    _asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
 ) {
     commands.spawn((
         DirectionalLight {
@@ -89,7 +89,6 @@ fn setup(
         PanOrbitCamera::default(),
         AtmosphereCamera::default(),
         Name::new("CAMMIE"),
-        ScreenSpaceAmbientOcclusion::default(),
     ));
 
     commands.insert_resource(AmbientLight {
@@ -97,12 +96,15 @@ fn setup(
         brightness: 50f32,
     });
 
-    let mut blocks = VoxelData::default();
-    blocks.set_block(IVec3::new(1, 1, 1), BlockType::Grass(0));
+    spawn_mesh(commands, meshes, materials);
+}
 
-    let l_system = TreeLSystem::grow_new(create_branch_piece(&Vec3::ZERO));
-    l_system.apply_tree_at(IVec3::new(31, 0, 31), &mut blocks);
-
+fn spawn_mesh(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
+) {
+    let blocks = get_tree_voxel_data();
     let mesh = generate_mesh(&blocks, 0, ChunkLod::Full);
 
     commands.spawn((
@@ -121,76 +123,72 @@ fn setup(
     ));
 }
 
-fn create_branch_piece(pos: &Vec3) -> Vec<LSystemEntry> {
-    const LEN: usize = 10;
-
-    let mut pieces = Vec::new();
-    let thickness: f32 = 2.0;
-
-    let mut rng = rand::rng();
-    let pos_offset = Vec3 {
-        x: rng.random(),
-        y: 0.,
-        z: rng.random(),
-    };
-
-    for i in 1..LEN {
-        pieces.push(LSystemEntry {
-            pos: pos + pos_offset + Vec3::Y * i as f32,
-            entry_type: LSystemEntryType::Stem,
-            thickness,
-        });
-    }
-    pieces.push(LSystemEntry {
-        pos: pos + pos_offset + Vec3::Y * LEN as f32,
-        entry_type: LSystemEntryType::Branch {
-            angle_x: 0.,
-            angle_z: 0.,
-            available_dirs: Directions::all(),
-        },
-        thickness,
-    });
-    pieces
-}
-
 fn rebuild_tree_system(
-    mut tree_entities: Query<
-        (
-            &mut Mesh3d,
-            &mut MeshMaterial3d<ExtendedMaterial<StandardMaterial, TerrainMaterial>>,
-        ),
-        With<TreeGen>,
-    >,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
+    mut tree_entities: Query<Entity, With<TreeGen>>,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
+    mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
 ) {
     if !input.pressed(KeyCode::Space) {
         return;
     }
 
-    for (mut tree_mesh, mut tree_material) in &mut tree_entities {
-        let mut blocks = VoxelData::default();
-        blocks.set_block(IVec3::new(1, 1, 1), BlockType::Grass(0));
-
-        let l_system = TreeLSystem::grow_new(create_branch_piece(&Vec3::ZERO));
-        l_system.apply_tree_at(IVec3::new(31, 1, 31), &mut blocks);
-
-        let new_mesh = generate_mesh(&blocks, 0, ChunkLod::Full);
-
-        meshes.remove(tree_mesh.id());
-        tree_mesh.0 = meshes.add(new_mesh.expect("No Mesh").0);
-
-        materials.remove(tree_material.0.id());
-        tree_material.0 = materials.add(ExtendedMaterial {
-            base: Color::WHITE.into(),
-            extension: TerrainMaterial {
-                chunk_blocks: blocks.array,
-                palette: blocks.palette,
-                chunk_pos: IVec3::ZERO,
-                chunk_lod: ChunkLod::Full.multiplier_i32(),
-                min_chunk_height: 0,
-            },
-        });
+    for entity in &mut tree_entities {
+        commands.entity(entity).despawn();
     }
+
+    spawn_mesh(commands, meshes, materials);
+}
+
+fn get_tree_voxel_data() -> VoxelData {
+    let mut blocks = VoxelData::default();
+
+    let seed = rng().next_u32();
+
+    let mut noise = FastNoiseLite::with_seed(seed as i32);
+    noise.set_noise_type(Some(fastnoise_lite::NoiseType::Value));
+    noise.set_frequency(Some(100.));
+
+    let tree_generator = TreeStructureGenerator {
+        fixed_structure_metadata: VoxelStructureMetadata {
+            debug_rgb_multiplier: [0., 0., 0.],
+            generate_debug_blocks: false,
+            generation_size: [0, 0],
+            grid_offset: [0, 0],
+            model_size: [0, 0, 0],
+            noise,
+        },
+    };
+
+    let tree_model = tree_generator.get_structure_model(IVec2::new(0, 0), ChunkLod::Full);
+
+    for x in 0..CHUNK_SIZE {
+        if x >= tree_model.len() {
+            break;
+        }
+
+        let tree_model_x = &tree_model[x];
+        for y in 0..CHUNK_SIZE {
+            if y >= tree_model_x.len() {
+                break;
+            }
+
+            let tree_model_y = &tree_model_x[y];
+            for z in 0..CHUNK_SIZE {
+                if z >= tree_model_y.len() {
+                    break;
+                }
+
+                let tree_model_block = tree_model_y[z];
+
+                blocks.set_block(
+                    IVec3::new(x as i32 + 1, y as i32 + 1, z as i32 + 1),
+                    tree_model_block,
+                );
+            }
+        }
+    }
+
+    blocks
 }

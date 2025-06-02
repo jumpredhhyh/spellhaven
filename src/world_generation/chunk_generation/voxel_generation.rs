@@ -1,11 +1,16 @@
 use crate::utils::div_floor;
+use crate::world_generation::chunk_generation::structure_generator::{
+    StructureGenerator, StructureGeneratorCache,
+};
 use crate::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 use crate::world_generation::chunk_loading::country_cache::{CountryCache, Path, PathLine};
 use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
-use noise::{Add, Constant, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
+use noise::{
+    Add, Constant, Max, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex, TranslatePoint,
+};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::usize;
@@ -50,6 +55,12 @@ pub fn generate_voxels(
         &country_cache.bottom_path_cache.paths,
         &country_cache.left_path_cache.paths,
     ];
+
+    let structure_generators: Vec<StructureGeneratorCache> = generation_options
+        .structure_generators
+        .iter()
+        .map(|structure_generator| StructureGeneratorCache::new(structure_generator))
+        .collect();
 
     for x in 0..CHUNK_SIZE + 2 {
         for z in 0..CHUNK_SIZE + 2 {
@@ -130,7 +141,7 @@ pub fn generate_voxels(
                 );
             }
 
-            for structure_generator in &generation_options.structure_generators {
+            for structure_generator in &structure_generators {
                 let structure_metadata = structure_generator.get_structure_metadata();
                 let structure_offset_x = div_floor(
                     total_x + structure_metadata.grid_offset[0],
@@ -244,10 +255,13 @@ pub fn generate_voxels(
                         structure_noise_height_z as f64,
                     ]);
 
-                    for (index, sub_structure) in structure_generator.get_structure_model(IVec2 {
-                        x: structure_offset_x,
-                        y: structure_offset_z,
-                    })[structure_x as usize]
+                    for (index, sub_structure) in structure_generator.get_structure_model(
+                        IVec2 {
+                            x: structure_offset_x,
+                            y: structure_offset_z,
+                        },
+                        chunk_lod,
+                    )[structure_x as usize]
                         .iter()
                         .enumerate()
                     {
@@ -316,22 +330,19 @@ pub fn get_mountain_biome_noise(generation_options: &GenerationOptions) -> impl 
     Multiply::new(
         SmoothStep::new(Multiply::new(
             Add::new(
-                ScalePoint::new(Simplex::new(rng.random())).set_scale(0.5f64.powi(16)),
+                ScalePoint::new(Simplex::new(rng.random())).set_scale(0.5f64.powi(15)),
                 Constant::new(1.),
             ),
             Constant::new(0.5),
         ))
         .set_steps(4.)
         .set_smoothness(0.5),
-        GFT::new_with_source(noise::Max::new(
-            noise::Add::new(
-                ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.random())),
-                Constant::new(-0.),
-            ),
+        GFT::new_with_source(Max::new(
+            ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.random())),
             Constant::new(0.),
         ))
-        .set_frequency(0.5f64.powi(14))
-        .set_amplitude(7500.)
+        .set_frequency(0.5f64.powi(13))
+        .set_amplitude(3750.)
         .set_octaves(11)
         .set_gradient(1.),
     )
@@ -341,19 +352,20 @@ pub fn get_terrain_noise(generation_options: &GenerationOptions) -> impl NoiseFn
     let mut rng = StdRng::seed_from_u64(generation_options.seed + 1);
 
     Add::new(
-        Add::new(
-            get_mountain_biome_noise(generation_options),
-            GFT::new_with_source(noise::Max::new(
-                noise::Add::new(
+        Multiply::new(
+            ScalePoint::new(Add::new(
+                get_mountain_biome_noise(generation_options),
+                GFT::new_with_source(Max::new(
                     ShiftNScale::<_, 2, 1>::new(Simplex::new(rng.random())),
-                    Constant::new(-0.),
-                ),
-                Constant::new(0.),
+                    Constant::new(0.),
+                ))
+                .set_frequency(0.5f64.powi(13))
+                .set_amplitude(500.)
+                .set_octaves(11)
+                .set_gradient(1.),
             ))
-            .set_frequency(0.5f64.powi(14))
-            .set_amplitude(1000.)
-            .set_octaves(11)
-            .set_gradient(1.),
+            .set_scale(VOXEL_SIZE as f64),
+            Constant::new(1. / VOXEL_SIZE as f64),
         ),
         Constant::new(-1.),
     )

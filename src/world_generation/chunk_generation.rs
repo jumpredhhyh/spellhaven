@@ -32,7 +32,7 @@ pub mod voxel_types;
 
 //pub const LEVEL_OF_DETAIL: i32 = 1;
 pub const CHUNK_SIZE: usize = 64;
-pub const VOXEL_SIZE: f32 = 0.5;
+pub const VOXEL_SIZE: f32 = 0.25;
 
 pub struct ChunkTaskData {
     pub mesh: Mesh,

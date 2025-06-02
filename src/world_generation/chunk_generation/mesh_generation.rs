@@ -162,10 +162,11 @@ pub fn generate_mesh(
     }
 
     for position in positions.iter_mut() {
-        position[0] = (position[0] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
+        position[0] = (position[0] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + VOXEL_SIZE;
         position[1] =
-            (position[1] + min_height as f32 - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
-        position[2] = (position[2] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + 0.5;
+            (position[1] + min_height as f32 - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32()
+                + VOXEL_SIZE;
+        position[2] = (position[2] - 0.5) * VOXEL_SIZE * chunk_lod.multiplier_f32() + VOXEL_SIZE;
     }
 
     let mut mesh_triangles: Vec<u32> = Vec::new();

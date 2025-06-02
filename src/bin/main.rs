@@ -64,7 +64,7 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
 
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 50f32,
+        brightness: 75f32,
     });
 
     // commands.spawn(SceneBundle {
