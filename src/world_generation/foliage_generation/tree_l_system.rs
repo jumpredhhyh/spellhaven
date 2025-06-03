@@ -85,7 +85,7 @@ pub trait LSystem<EntryEnum: Clone + Copy> {
 
             if length > 0 {
                 data.splice(i..i + 1, branches);
-                i += length;    
+                i += length;
             }
 
             i += 1;
@@ -135,12 +135,42 @@ pub trait LSystem<EntryEnum: Clone + Copy> {
             entry_type: tip_piece,
             thickness,
         });
-        
+
+        pieces
+    }
+
+    fn create_straight_piece_dir(
+        pos: Vec3,
+        direction: Vec3,
+        thickness: f32,
+        length: usize,
+        between_piece: EntryEnum,
+        tip_piece: EntryEnum,
+    ) -> Vec<LSystemEntry<EntryEnum>> {
+        let mut pieces = Vec::new();
+
+        for i in 0..length {
+            pieces.push(LSystemEntry {
+                pos: pos + direction * i as f32,
+                entry_type: between_piece,
+                thickness,
+            });
+        }
+        pieces.push(LSystemEntry {
+            pos: pos + direction * length as f32,
+            entry_type: tip_piece,
+            thickness,
+        });
+
         pieces
     }
 
     fn get_start_state(position: Vec3, rng: &mut StdRng) -> Vec<LSystemEntry<EntryEnum>>;
     fn process_tree(start_state: &mut Vec<LSystemEntry<EntryEnum>>, rng: &mut StdRng);
     fn get_block_from_entry(entry: &LSystemEntry<EntryEnum>) -> BlockType;
-    fn recurse_entry(entry: &LSystemEntry<EntryEnum>, rng: &mut StdRng, branches: &mut Vec<LSystemEntry<EntryEnum>>);
+    fn recurse_entry(
+        entry: &LSystemEntry<EntryEnum>,
+        rng: &mut StdRng,
+        branches: &mut Vec<LSystemEntry<EntryEnum>>,
+    );
 }

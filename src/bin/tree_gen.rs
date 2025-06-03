@@ -162,6 +162,10 @@ fn get_tree_voxel_data() -> Vec<(Box<VoxelData>, IVec3)> {
         (Box::new(VoxelData::default()), IVec3::new(1, 0, 1)),
         (Box::new(VoxelData::default()), IVec3::new(1, 1, 0)),
         (Box::new(VoxelData::default()), IVec3::new(1, 1, 1)),
+        (Box::new(VoxelData::default()), IVec3::new(0, 2, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(0, 2, 1)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 2, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 2, 1)),
     ];
 
     let seed = rng().next_u32();
@@ -190,7 +194,11 @@ fn get_tree_voxel_data() -> Vec<(Box<VoxelData>, IVec3)> {
     chunks
 }
 
-fn apply_trees(blocks: &mut VoxelData, chunk_position: IVec3, tree_model: &Vec<Vec<Vec<BlockType>>>) {
+fn apply_trees(
+    blocks: &mut VoxelData,
+    chunk_position: IVec3,
+    tree_model: &Vec<Vec<Vec<BlockType>>>,
+) {
     let chunk_x = chunk_position.x * CHUNK_SIZE as i32;
     let chunk_y = chunk_position.y * CHUNK_SIZE as i32;
     let chunk_z = chunk_position.z * CHUNK_SIZE as i32;
