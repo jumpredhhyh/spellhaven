@@ -1,6 +1,6 @@
 use bevy::core_pipeline::experimental::taa::TemporalAntiAliasing;
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
-use bevy::pbr::{ExtendedMaterial, ScreenSpaceAmbientOcclusion};
+use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::render::camera::Exposure;
 use bevy::window::PresentMode;
@@ -15,11 +15,13 @@ use spellhaven::animations::AnimationPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::terrain_material::TerrainMaterial;
 use spellhaven::world_generation::chunk_generation::mesh_generation::generate_mesh;
+use spellhaven::world_generation::chunk_generation::oak_structure_generator::OakStructureGenerator;
+use spellhaven::world_generation::chunk_generation::pine_structure_generator::PineStructureGenerator;
 use spellhaven::world_generation::chunk_generation::structure_generator::{
-    StructureGenerator, TreeStructureGenerator, VoxelStructureMetadata,
+    StructureGenerator, VoxelStructureMetadata,
 };
 use spellhaven::world_generation::chunk_generation::voxel_types::VoxelData;
-use spellhaven::world_generation::chunk_generation::CHUNK_SIZE;
+use spellhaven::world_generation::chunk_generation::{BlockType, CHUNK_SIZE, VOXEL_SIZE};
 use spellhaven::world_generation::voxel_world::ChunkLod;
 use std::f32::consts::PI;
 
@@ -104,23 +106,32 @@ fn spawn_mesh(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ExtendedMaterial<StandardMaterial, TerrainMaterial>>>,
 ) {
-    let blocks = get_tree_voxel_data();
-    let mesh = generate_mesh(&blocks, 0, ChunkLod::Full);
+    let chunks = get_tree_voxel_data();
 
-    commands.spawn((
-        Mesh3d(meshes.add(mesh.expect("No Mesh").0)),
-        MeshMaterial3d(materials.add(ExtendedMaterial {
-            base: Color::WHITE.into(),
-            extension: TerrainMaterial {
-                chunk_blocks: blocks.array,
-                palette: blocks.palette,
-                chunk_pos: IVec3::ZERO,
-                chunk_lod: ChunkLod::Full.multiplier_i32(),
-                min_chunk_height: 0,
-            },
-        })),
-        TreeGen,
-    ));
+    for (chunk, chunk_pos) in chunks {
+        let mesh = generate_mesh(&chunk, 0, ChunkLod::Full);
+
+        let Some(mesh) = mesh else {
+            continue;
+        };
+
+        commands.spawn((
+            Transform::from_translation(chunk_pos.as_vec3() * CHUNK_SIZE as f32 * VOXEL_SIZE),
+            Name::new("Chunk"),
+            Mesh3d(meshes.add(mesh.0)),
+            MeshMaterial3d(materials.add(ExtendedMaterial {
+                base: Color::WHITE.into(),
+                extension: TerrainMaterial {
+                    chunk_blocks: chunk.array,
+                    palette: chunk.palette,
+                    chunk_pos: chunk_pos,
+                    chunk_lod: ChunkLod::Full.multiplier_i32(),
+                    min_chunk_height: chunk_pos.y * CHUNK_SIZE as i32,
+                },
+            })),
+            TreeGen,
+        ));
+    }
 }
 
 fn rebuild_tree_system(
@@ -141,8 +152,17 @@ fn rebuild_tree_system(
     spawn_mesh(commands, meshes, materials);
 }
 
-fn get_tree_voxel_data() -> VoxelData {
-    let mut blocks = VoxelData::default();
+fn get_tree_voxel_data() -> Vec<(Box<VoxelData>, IVec3)> {
+    let mut chunks = vec![
+        (Box::new(VoxelData::default()), IVec3::new(0, 0, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(0, 0, 1)),
+        (Box::new(VoxelData::default()), IVec3::new(0, 1, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(0, 1, 1)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 0, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 0, 1)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 1, 0)),
+        (Box::new(VoxelData::default()), IVec3::new(1, 1, 1)),
+    ];
 
     let seed = rng().next_u32();
 
@@ -150,7 +170,7 @@ fn get_tree_voxel_data() -> VoxelData {
     noise.set_noise_type(Some(fastnoise_lite::NoiseType::Value));
     noise.set_frequency(Some(100.));
 
-    let tree_generator = TreeStructureGenerator {
+    let tree_generator = PineStructureGenerator {
         fixed_structure_metadata: VoxelStructureMetadata {
             debug_rgb_multiplier: [0., 0., 0.],
             generate_debug_blocks: false,
@@ -163,32 +183,64 @@ fn get_tree_voxel_data() -> VoxelData {
 
     let tree_model = tree_generator.get_structure_model(IVec2::new(0, 0), ChunkLod::Full);
 
-    for x in 0..CHUNK_SIZE {
+    for (chunk, chunk_pos) in &mut chunks {
+        apply_trees(chunk, *chunk_pos, &tree_model);
+    }
+
+    chunks
+}
+
+fn apply_trees(blocks: &mut VoxelData, chunk_position: IVec3, tree_model: &Vec<Vec<Vec<BlockType>>>) {
+    let chunk_x = chunk_position.x * CHUNK_SIZE as i32;
+    let chunk_y = chunk_position.y * CHUNK_SIZE as i32;
+    let chunk_z = chunk_position.z * CHUNK_SIZE as i32;
+
+    for x in chunk_x - 1..chunk_x + CHUNK_SIZE as i32 + 1 {
+        if x < 0 {
+            continue;
+        }
+
+        let x = x as usize;
+
         if x >= tree_model.len() {
             break;
         }
 
         let tree_model_x = &tree_model[x];
-        for y in 0..CHUNK_SIZE {
+        for y in chunk_y - 1..chunk_y + CHUNK_SIZE as i32 + 1 {
+            if y < 0 {
+                continue;
+            }
+
+            let y = y as usize;
+
             if y >= tree_model_x.len() {
                 break;
             }
 
             let tree_model_y = &tree_model_x[y];
-            for z in 0..CHUNK_SIZE {
+            for z in chunk_z - 1..chunk_z + CHUNK_SIZE as i32 + 1 {
+                if z < 0 {
+                    continue;
+                }
+
+                let z = z as usize;
+
                 if z >= tree_model_y.len() {
                     break;
                 }
 
                 let tree_model_block = tree_model_y[z];
 
+                let chunk_x = x as i32 - chunk_x;
+                let chunk_y = y as i32 - chunk_y;
+                let chunk_z = z as i32 - chunk_z;
+
                 blocks.set_block(
-                    IVec3::new(x as i32 + 1, y as i32 + 1, z as i32 + 1),
+                    IVec3::new(chunk_x + 1, chunk_y + 1, chunk_z + 1),
                     tree_model_block,
                 );
             }
         }
     }
-
-    blocks
 }

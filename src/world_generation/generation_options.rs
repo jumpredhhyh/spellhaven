@@ -1,6 +1,8 @@
+use crate::world_generation::chunk_generation::oak_structure_generator::OakStructureGenerator;
 use crate::world_generation::chunk_generation::structure_generator::{
-    FixedStructureGenerator, StructureGenerator, TreeStructureGenerator, VoxelStructureMetadata,
+    FixedStructureGenerator, StructureGenerator, VoxelStructureMetadata,
 };
+use crate::world_generation::chunk_generation::tree_structure_generator::TreeStructureGenerator;
 use crate::world_generation::chunk_generation::BlockType;
 use crate::world_generation::chunk_loading::country_cache::{
     CountryCache, PathCache, StructureCache,
@@ -34,7 +36,7 @@ impl GenerationOptionsResource {
                 path_cache: GenerationCache::new(),
                 structure_cache: GenerationCache::new(),
                 structure_generators: vec![
-                    Arc::new(Box::new(TreeStructureGenerator::new(
+                    Arc::new(Box::new(OakStructureGenerator::new(
                         VoxelStructureMetadata {
                             model_size: [27, 27, 27],
                             generation_size: [64, 64],
@@ -44,7 +46,7 @@ impl GenerationOptionsResource {
                             noise: get_seeded_white_noise(rng.random()),
                         },
                     ))),
-                    Arc::new(Box::new(TreeStructureGenerator::new(
+                    Arc::new(Box::new(OakStructureGenerator::new(
                         VoxelStructureMetadata {
                             model_size: [27, 27, 27],
                             generation_size: [64, 64],
@@ -54,7 +56,7 @@ impl GenerationOptionsResource {
                             noise: get_seeded_white_noise(rng.random()),
                         },
                     ))),
-                    Arc::new(Box::new(TreeStructureGenerator::new(
+                    Arc::new(Box::new(OakStructureGenerator::new(
                         VoxelStructureMetadata {
                             model_size: [27, 27, 27],
                             generation_size: [64, 64],
