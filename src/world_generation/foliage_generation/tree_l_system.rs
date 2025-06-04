@@ -73,8 +73,10 @@ pub trait LSystem<EntryEnum: Clone + Copy> {
         voxel_grid
     }
 
-    fn recurse_l_system(data: &mut Vec<LSystemEntry<EntryEnum>>, rng: &mut StdRng) {
+    fn recurse_l_system(data: &mut Vec<LSystemEntry<EntryEnum>>, rng: &mut StdRng) -> bool {
         let mut i = 0usize;
+        let mut changed = false;
+
         while i < data.len() {
             let entry = &data[i];
             let mut branches: Vec<LSystemEntry<EntryEnum>> = vec![];
@@ -86,10 +88,13 @@ pub trait LSystem<EntryEnum: Clone + Copy> {
             if length > 0 {
                 data.splice(i..i + 1, branches);
                 i += length;
+                changed = true;
             }
 
             i += 1;
         }
+
+        changed
     }
 
     fn create_straight_piece(

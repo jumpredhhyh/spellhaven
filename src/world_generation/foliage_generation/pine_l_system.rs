@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use bevy::math::Vec3;
 use rand::{rngs::StdRng, Rng};
 
@@ -25,7 +23,7 @@ impl LSystem<PineEntryType> for PineLSystem {
     fn get_start_state(position: Vec3, rng: &mut StdRng) -> Vec<LSystemEntry<PineEntryType>> {
         let mut entries = vec![];
 
-        let length = (rng.random_range(9.0..11.0) / VOXEL_SIZE) as usize;
+        let length = (rng.random_range(13.0..16.0) / VOXEL_SIZE) as usize;
         let mut last_length = length;
 
         entries.extend(Self::create_straight_piece_dir(
@@ -56,9 +54,7 @@ impl LSystem<PineEntryType> for PineLSystem {
     }
 
     fn process_tree(mut start_state: &mut Vec<LSystemEntry<PineEntryType>>, rng: &mut StdRng) {
-        for _ in 0..8 {
-            Self::recurse_l_system(&mut start_state, rng);
-        }
+        while Self::recurse_l_system(&mut start_state, rng) {}
         Self::add_leafs(&mut start_state);
     }
 
@@ -113,11 +109,13 @@ impl LSystem<PineEntryType> for PineLSystem {
                 let new_extensions = extensions - 1;
                 let new_thickness = (entry.thickness - 0.5).max(0.75);
 
+                let downforce = rng.random_range(0.2..0.75);
+
                 branches.extend(Self::create_straight_piece_dir(
                     entry.pos,
-                    direction,
+                    (direction - Vec3::Y * downforce).normalize(),
                     new_thickness,
-                    (rng.random_range(2.5..4.0) / VOXEL_SIZE) as usize,
+                    (rng.random_range(2.5..3.5) / VOXEL_SIZE) as usize,
                     PineEntryType::Log,
                     PineEntryType::Branch {
                         extensions: new_extensions,
