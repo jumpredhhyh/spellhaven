@@ -4,7 +4,8 @@ use crate::world_generation::chunk_generation::{ChunkTaskData, CHUNK_SIZE, VOXEL
 use crate::world_generation::chunk_loading::country_cache::CountryCache;
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
 use crate::world_generation::generation_options::GenerationOptions;
-use bevy::math::IVec3;
+use bevy::log::info;
+use bevy::math::{IVec3, Vec3};
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
 use std::collections::HashMap;
@@ -150,15 +151,17 @@ impl VoxelWorld for QuadTreeVoxelWorld {
 
         let mesh = generate_mesh(&data, min_height, chunk_lod);
 
+        let chunk_transform_pos = Vec3::new(
+            new_chunk_pos[0] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
+            0.0,
+            new_chunk_pos[2] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
+        );
+
         return ChunkGenerationResult {
             task_data: match mesh {
                 None => None,
                 Some(mesh) => Some(ChunkTaskData {
-                    transform: Transform::from_xyz(
-                        new_chunk_pos[0] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
-                        0.0,
-                        new_chunk_pos[2] as f32 * CHUNK_SIZE as f32 * VOXEL_SIZE,
-                    ),
+                    transform: Transform::from_translation(chunk_transform_pos),
                     collider: if chunk_lod == ChunkLod::Full {
                         Some(Collider::trimesh(mesh.1, mesh.2).expect("Failed to build trimesh"))
                     } else {

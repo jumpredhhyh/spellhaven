@@ -26,10 +26,10 @@ use std::sync::{Arc, Mutex};
 
 pub mod mesh_generation;
 pub mod noise;
-pub mod structure_generator;
-pub mod tree_structure_generator;
 pub mod oak_structure_generator;
 pub mod pine_structure_generator;
+pub mod structure_generator;
+pub mod tree_structure_generator;
 pub mod voxel_generation;
 pub mod voxel_types;
 
@@ -192,7 +192,7 @@ fn start_chunk_tasks(
             Some(country_cache) => match country_cache {
                 GenerationState::Generating => {}
                 GenerationState::Some(country_cache) => {
-                    if let Some(mut entity) = commands.get_entity(entity) {
+                    if let Ok(mut entity) = commands.get_entity(entity) {
                         current_added_tasks += 1;
 
                         let generation_options = generation_options.0.clone();
@@ -591,7 +591,7 @@ fn check_entities_for_deletion(
         if generated_chunks.get(entity).is_ok() {
             new_entities.push(entity);
         } else {
-            if let Some(mut entity) = commands.get_entity(entity) {
+            if let Ok(mut entity) = commands.get_entity(entity) {
                 entity.despawn();
             } else {
                 new_entities.push(entity);
@@ -673,7 +673,7 @@ fn set_generated_chunks(
                                 } else {
                                     if let Data(_, despawn_entities) = node {
                                         for despawn_entity in despawn_entities.clone() {
-                                            if let Some(mut entity) =
+                                            if let Ok(mut entity) =
                                                 commands.get_entity(despawn_entity.clone())
                                             {
                                                 entity.despawn();
@@ -695,7 +695,7 @@ fn set_generated_chunks(
                 },
             }
 
-            if let Some(mut current_entity) = commands.get_entity(entity) {
+            if let Ok(mut current_entity) = commands.get_entity(entity) {
                 if let Some(chunk_task_data) = chunk_generation_result.task_data {
                     let triangle_count = chunk_task_data.mesh.indices().unwrap().len() / 3;
 
@@ -724,8 +724,13 @@ fn set_generated_chunks(
                     ));
 
                     if chunk_generation_result.lod == ChunkLod::Full {
-                        current_entity
-                            .insert((RigidBody::Fixed, chunk_task_data.collider.unwrap()));
+                        current_entity.insert((
+                            RigidBody::Fixed,
+                            chunk_task_data.collider.unwrap(),
+                            GlobalTransform::from_translation(
+                                chunk_task_data.transform.translation,
+                            ),
+                        ));
                     }
                 } else {
                     current_entity.despawn();
@@ -754,7 +759,7 @@ fn set_generated_caches(
 fn setup_gizmo_settings(mut config: ResMut<GizmoConfigStore>) {
     let (config, ..) = config.config_mut::<DefaultGizmoConfigGroup>();
     config.depth_bias = -1.;
-    config.line_width = 4.;
+    config.line.width = 4.;
 }
 
 fn draw_path_gizmos(

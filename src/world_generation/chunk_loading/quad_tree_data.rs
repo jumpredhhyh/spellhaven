@@ -59,7 +59,7 @@ impl<T> QuadTreeNode<T> {
 
             if *child_progress_lock == 4 {
                 for entity in entities {
-                    if let Some(mut entity) = commands.get_entity(entity.clone()) {
+                    if let Ok(mut entity) = commands.get_entity(entity.clone()) {
                         entity.despawn();
                     }
                 }

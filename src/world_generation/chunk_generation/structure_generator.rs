@@ -1,10 +1,7 @@
-use crate::world_generation::{
-    chunk_generation::BlockType,
-    voxel_world::ChunkLod,
-};
-use bevy::{math::IVec2, utils::HashMap};
+use crate::world_generation::{chunk_generation::BlockType, voxel_world::ChunkLod};
+use bevy::math::IVec2;
 use fastnoise_lite::FastNoiseLite;
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 pub struct VoxelStructureMetadata {
     pub model_size: [i32; 3],

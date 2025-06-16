@@ -8,9 +8,7 @@ use crate::world_generation::generation_options::GenerationOptions;
 use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::{DVec2, IVec2};
 use bevy::prelude::Vec2;
-use noise::{
-    Add, Constant, Max, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex, TranslatePoint,
-};
+use noise::{Add, Constant, Max, Min, MultiFractal, Multiply, NoiseFn, ScalePoint, Simplex};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use std::usize;

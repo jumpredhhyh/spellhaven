@@ -3,10 +3,10 @@ use crate::world_generation::chunk_generation::{
     ChunkGenerationTask, ChunkGenerator, ChunkParent, CHUNK_SIZE, VOXEL_SIZE,
 };
 use crate::world_generation::voxel_world::{ChunkLod, QuadTreeVoxelWorld, VoxelWorld, MAX_LOD};
+use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::log::info;
 use bevy::prelude::{
-    App, Commands, Component, Entity, IntoSystemConfigs, Plugin, Query, ResMut, Transform, Update,
-    Vec3,
+    App, Commands, Component, Entity, Plugin, Query, ResMut, Transform, Update, Vec3,
 };
 
 pub struct ChunkLoaderPlugin;
@@ -15,8 +15,9 @@ impl Plugin for ChunkLoaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (load_chunks, unload_chunks)
-                .after(crate::world_generation::chunk_generation::upgrade_quad_trees),
+            (load_chunks, unload_chunks).after_ignore_deferred(
+                crate::world_generation::chunk_generation::upgrade_quad_trees,
+            ),
         );
     }
 }

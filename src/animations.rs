@@ -1,5 +1,4 @@
 use bevy::app::App;
-use bevy::hierarchy::DespawnRecursiveExt;
 use bevy::prelude::{
     Commands, Component, Entity, Plugin, Query, Res, Time, Transform, Update, Vec3, With, Without,
 };
@@ -50,7 +49,7 @@ fn animate_despawn_animation(
     >,
 ) {
     for entity in &mut despawn_animations_no_transform {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     for (entity, mut transform, mut despawn_animation) in &mut despawn_animations {
@@ -62,7 +61,7 @@ fn animate_despawn_animation(
             despawn_animation.1.unwrap().y - 40. * despawn_animation.0.min(1.).powi(2);
 
         if despawn_animation.0 >= 1. {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
             continue;
         }
 

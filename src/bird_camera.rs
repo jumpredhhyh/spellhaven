@@ -38,5 +38,12 @@ fn move_camera_pivot(
     camera: Query<&PanOrbitCamera>,
     mut camera_pivot: Query<&mut Transform, With<CameraPivotPoint>>,
 ) {
-    camera_pivot.single_mut().translation = camera.single().focus;
+    let Ok(mut camera_pivot) = camera_pivot.single_mut() else {
+        return;
+    };
+
+    let Ok(camera) = camera.single() else {
+        return;
+    };
+    camera_pivot.translation = camera.focus;
 }

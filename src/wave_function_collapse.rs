@@ -8,9 +8,10 @@ use bevy::{
         entity::Entity,
         system::{Commands, ResMut},
     },
+    image::{TextureAtlas, TextureAtlasLayout},
     math::{IVec2, UVec2, Vec3},
     prelude::default,
-    sprite::{Sprite, TextureAtlas, TextureAtlasLayout},
+    sprite::Sprite,
     transform::components::Transform,
 };
 
@@ -18,7 +19,7 @@ pub struct WaveFunctionCollapsePlugin;
 
 impl Plugin for WaveFunctionCollapsePlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_plugins(FlatCameraPlugin)
+        app.add_plugins(BirdCameraPlugin)
             .add_systems(Startup, startup);
     }
 }
@@ -98,7 +99,7 @@ fn spawn_sprite(
 
 use bitflags::bitflags;
 
-use crate::flat_camera::FlatCameraPlugin;
+use crate::bird_camera::BirdCameraPlugin;
 
 bitflags! {
     #[derive(Clone, Copy, PartialEq)]

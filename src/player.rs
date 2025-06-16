@@ -122,8 +122,7 @@ fn move_body(
     player: Query<&Transform, (With<Player>, Without<PlayerBody>)>,
     mut player_body: Query<&mut Transform, (With<PlayerBody>, Without<Player>)>,
 ) {
-    let (Ok(player), Ok(mut player_body)) = (player.get_single(), player_body.get_single_mut())
-    else {
+    let (Ok(player), Ok(mut player_body)) = (player.single(), player_body.single_mut()) else {
         return;
     };
 
@@ -141,7 +140,7 @@ fn move_camera(
         return;
     }
 
-    let (Ok(player), Ok(mut camera)) = (player.get_single(), camera.get_single_mut()) else {
+    let (Ok(player), Ok(mut camera)) = (player.single(), camera.single_mut()) else {
         return;
     };
 
@@ -211,7 +210,7 @@ fn movement(
             movement_speed *= 50.;
         }
 
-        if let Ok(player_camera) = player_camera.get_single() {
+        if let Ok(player_camera) = player_camera.single() {
             // Rotate vector to camera
             let rotation = Quat::from_rotation_y(player_camera.yaw.unwrap_or(0.));
             move_direction = rotation.mul_vec3(move_direction.normalize_or_zero() * movement_speed);

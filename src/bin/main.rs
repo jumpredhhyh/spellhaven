@@ -3,6 +3,7 @@ use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 use bevy_atmosphere::prelude::AtmospherePlugin;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
@@ -31,9 +32,12 @@ fn main() {
             RapierPhysicsPlugin::<NoUserData>::default(),
             //RapierDebugRenderPlugin::default(),
             PlayerPlugin,
-            WireframePlugin,
+            WireframePlugin { ..default() },
             AnimationPlugin,
             //BirdCameraPlugin,
+            EguiPlugin {
+                enable_multipass_for_primary_context: false,
+            },
             WorldInspectorPlugin::new(),
             GameUiPlugin,
             SpellhavenDebugPlugin,
@@ -65,6 +69,7 @@ fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 75f32,
+        ..default()
     });
 
     // commands.spawn(SceneBundle {

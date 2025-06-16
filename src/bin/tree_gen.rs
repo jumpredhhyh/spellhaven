@@ -6,6 +6,7 @@ use bevy::render::camera::Exposure;
 use bevy::window::PresentMode;
 use bevy_atmosphere::plugin::AtmosphereCamera;
 use bevy_atmosphere::prelude::AtmospherePlugin;
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
@@ -15,7 +16,6 @@ use spellhaven::animations::AnimationPlugin;
 use spellhaven::debug_tools::debug_resource::SpellhavenDebugPlugin;
 use spellhaven::terrain_material::TerrainMaterial;
 use spellhaven::world_generation::chunk_generation::mesh_generation::generate_mesh;
-use spellhaven::world_generation::chunk_generation::oak_structure_generator::OakStructureGenerator;
 use spellhaven::world_generation::chunk_generation::pine_structure_generator::PineStructureGenerator;
 use spellhaven::world_generation::chunk_generation::structure_generator::{
     StructureGenerator, VoxelStructureMetadata,
@@ -40,9 +40,12 @@ fn main() {
             AtmospherePlugin,
             RapierPhysicsPlugin::<NoUserData>::default(),
             //RapierDebugRenderPlugin::default(),
-            WireframePlugin,
+            WireframePlugin { ..default() },
             AnimationPlugin,
             //BirdCameraPlugin,
+            EguiPlugin {
+                enable_multipass_for_primary_context: false,
+            },
             WorldInspectorPlugin::new(),
             SpellhavenDebugPlugin,
             MaterialPlugin::<ExtendedMaterial<StandardMaterial, TerrainMaterial>>::default(),
@@ -96,6 +99,7 @@ fn setup(
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 50f32,
+        ..default()
     });
 
     spawn_mesh(commands, meshes, materials);

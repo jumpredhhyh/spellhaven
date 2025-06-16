@@ -1,11 +1,6 @@
-use std::f32::consts::PI;
-
 use bevy::{pbr::wireframe::WireframeConfig, prelude::*, window::PresentMode};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_panorbit_camera::PanOrbitCameraPlugin;
-use spellhaven::{
-    bird_camera::BirdCameraPlugin, wave_function_collapse::WaveFunctionCollapsePlugin,
-};
+use spellhaven::wave_function_collapse::WaveFunctionCollapsePlugin;
 
 fn main() {
     App::new()
@@ -33,7 +28,7 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, _asset_server: Res<AssetServer>) {
+fn setup(mut _commands: Commands, _asset_server: Res<AssetServer>) {
     // commands.spawn((
     //     DirectionalLightBundle {
     //         directional_light: DirectionalLight {
