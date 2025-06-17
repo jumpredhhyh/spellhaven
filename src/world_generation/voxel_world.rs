@@ -4,7 +4,6 @@ use crate::world_generation::chunk_generation::{ChunkTaskData, CHUNK_SIZE, VOXEL
 use crate::world_generation::chunk_loading::country_cache::CountryCache;
 use crate::world_generation::chunk_loading::quad_tree_data::QuadTreeNode;
 use crate::world_generation::generation_options::GenerationOptions;
-use bevy::log::info;
 use bevy::math::{IVec3, Vec3};
 use bevy::prelude::{Entity, IVec2, Resource, Transform};
 use bevy_rapier3d::prelude::Collider;
