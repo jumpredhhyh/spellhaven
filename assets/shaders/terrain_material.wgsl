@@ -27,7 +27,7 @@ fn fragment(
     in: VertexOutput,
     @builtin(front_facing) is_front: bool,
 ) -> FragmentOutput {
-     // generate a PbrInput struct from the StandardMaterial bindings
+    // generate a PbrInput struct from the StandardMaterial bindings
     var pbr_input = pbr_input_from_standard_material(in, is_front);
 
     // we can optionally modify the input before lighting and alpha_discard is applied
@@ -52,7 +52,7 @@ fn fragment(
     var voxel_size = 0.25;
     var chunk_size = f32(64 * terrain_material.chunk_lod) * voxel_size;
 
-    var adjusted_world_pos = (in.world_position.xyz + voxel_size * f32(terrain_material.chunk_lod - 1) - (in.world_normal.xyz * (voxel_size * f32(terrain_material.chunk_lod)) * voxel_size)) - vec3<f32>(0, f32(terrain_material.min_chunk_height) * voxel_size * f32(terrain_material.chunk_lod), 0); 
+    var adjusted_world_pos = (in.world_position.xyz + voxel_size * f32(terrain_material.chunk_lod - 1) - (in.world_normal.xyz * (voxel_size * f32(terrain_material.chunk_lod)) * voxel_size)) - vec3<f32>(0, f32(terrain_material.min_chunk_height) * voxel_size * f32(terrain_material.chunk_lod), 0);
 
     var chunk_pos_no_height = terrain_material.chunk_pos * vec3<i32>(1, 0, 1);
 

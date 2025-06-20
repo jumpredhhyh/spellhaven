@@ -13,14 +13,14 @@ use bevy::{
 use super::{BlockType, CHUNK_SIZE};
 
 #[derive(Debug, Clone, ShaderType, Default, Copy)]
-pub struct Vec4<T: ShaderSize> {
+pub struct ShaderVec4<T: ShaderSize> {
     one: T,
     two: T,
     three: T,
     four: T,
 }
 
-impl<T: ShaderSize> Index<usize> for Vec4<T> {
+impl<T: ShaderSize> Index<usize> for ShaderVec4<T> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -34,7 +34,7 @@ impl<T: ShaderSize> Index<usize> for Vec4<T> {
     }
 }
 
-impl<T: ShaderSize> IndexMut<usize> for Vec4<T> {
+impl<T: ShaderSize> IndexMut<usize> for ShaderVec4<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         match index {
             0 => &mut self.one,
@@ -47,8 +47,8 @@ impl<T: ShaderSize> IndexMut<usize> for Vec4<T> {
 }
 
 pub type VoxelArray =
-    [Vec4<u32>; ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4];
-pub type VoxelPalette = [Vec4<u32>; 128];
+    [ShaderVec4<u32>; ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4];
+pub type VoxelPalette = [ShaderVec4<u32>; 128];
 
 pub struct VoxelData {
     pub array: VoxelArray,
@@ -59,9 +59,9 @@ pub struct VoxelData {
 impl Default for VoxelData {
     fn default() -> Self {
         Self {
-            array: [Vec4::<u32>::default();
+            array: [ShaderVec4::<u32>::default();
                 ((CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) * (CHUNK_SIZE + 2) / 4 + 3) / 4],
-            palette: [Vec4::<u32>::default(); 128],
+            palette: [ShaderVec4::<u32>::default(); 128],
             block_map: Default::default(),
         }
     }

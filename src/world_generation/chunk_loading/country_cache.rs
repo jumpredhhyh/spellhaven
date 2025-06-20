@@ -294,11 +294,11 @@ impl PathCache {
         path_finding_lod: ChunkLod,
         generation_options: &GenerationOptions,
     ) -> Path {
-        // return Path {
-        //     lines: vec![],
-        //     box_pos_start: Default::default(),
-        //     box_pos_end: Default::default(),
-        // };
+        return Path {
+            lines: vec![],
+            box_pos_start: Default::default(),
+            box_pos_end: Default::default(),
+        };
 
         start_pos /= path_finding_lod.multiplier_i32();
         end_pos /= path_finding_lod.multiplier_i32();

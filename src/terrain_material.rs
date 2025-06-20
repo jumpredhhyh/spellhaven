@@ -25,3 +25,9 @@ impl MaterialExtension for TerrainMaterial {
         "shaders/terrain_material.wgsl".into()
     }
 }
+
+impl Material for TerrainMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/terrain_material.wgsl".into()
+    }
+}
