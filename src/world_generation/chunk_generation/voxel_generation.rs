@@ -10,12 +10,17 @@ use crate::world_generation::voxel_world::ChunkLod;
 use bevy::math::IVec2;
 use bevy::prelude::Vec2;
 use bracket_noise::prelude::FastNoise;
-use noise::core::worley::distance_functions::{
-    chebyshev, euclidean, euclidean_squared, manhattan, quadratic,
-};
+// use noise::core::worley::distance_functions::{
+//     chebyshev, euclidean, euclidean_squared, manhattan, quadratic,
+// };
+use noise::core::worley::distance_functions::{euclidean};
 use noise::core::worley::ReturnType;
+// use noise::{
+//     Add, Clamp, Constant, Fbm, Min, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable,
+//     Turbulence, Worley,
+// };
 use noise::{
-    Add, Clamp, Constant, Fbm, Min, MultiFractal, Multiply, NoiseFn, Perlin, ScalePoint, Seedable,
+    Add, Clamp, Constant, Multiply, NoiseFn, Perlin, ScalePoint, Seedable,
     Turbulence, Worley,
 };
 use rand::prelude::StdRng;
